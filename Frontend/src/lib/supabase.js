@@ -8,9 +8,5 @@ if (!url || !anonKey) {
     "Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY in Frontend/.env.local"
   );
 }
-else{
-  console.log("Supabase URL and anon key loaded successfully.");
-}
-
 
 export const supabase = createClient(url, anonKey);

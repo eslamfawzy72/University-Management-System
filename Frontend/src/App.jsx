@@ -1,28 +1,120 @@
-import { useState } from 'react'
+import { Navigate, Route, Routes } from "react-router-dom";
 
-import './App.css'
+import "./App.css";
+import { useAuth } from "./hooks/useAuth";
+import { useRole } from "./hooks/useRole";
+import { roleDashboardPath } from "./lib/roles";
+import AccessDenied from "./pages/AccessDenied";
+import AuthPage from "./pages/auth/AuthPage";
+import DashboardPage from "./pages/dashboard/DashboardPage";
 
-function App() {
-  const [count, setCount] = useState(0)
-
+function FullscreenState({ title, message }) {
   return (
-    <>
-      <div className="App">
-        <h1>Vite + React</h1>
-        <div className="card">
-          <button onClick={() => setCount((count) => count + 1)}>
-            count is {count}
-          </button>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test HMR
-          </p>
-        </div>
-        <p className="read-the-docs">
-          Click on the Vite and React logos to learn more
-        </p>
+    <section className="fullscreen-state">
+      <div className="fullscreen-state__card">
+        <p className="eyebrow">UniSystem</p>
+        <h1>{title}</h1>
+        <p>{message}</p>
       </div>
-    </>
-  )
+    </section>
+  );
 }
 
-export default App
+function RequireSession({ children }) {
+  const { loading, session } = useAuth();
+
+  if (loading) {
+    return <FullscreenState title="Loading session" message="Checking your Supabase login state..." />;
+  }
+
+  if (!session) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
+}
+
+function RoleGuard({ allowedRoles, children }) {
+  const { loading, profile } = useAuth();
+  const { role } = useRole();
+
+  if (loading) {
+    return <FullscreenState title="Loading profile" message="Reading your role from profiles..." />;
+  }
+
+  if (!profile?.role) {
+    return <AccessDenied message="Access denied: role is missing." />;
+  }
+
+  if (profile.role === "admin") {
+    return children;
+  }
+
+  if (!allowedRoles.includes(role)) {
+    return <AccessDenied message="Access denied: you do not have permission for this page." />;
+  }
+
+  return children;
+}
+
+function RootRedirect() {
+  const { loading, session, profile } = useAuth();
+
+  if (loading) {
+    return <FullscreenState title="Starting UniSystem" message="Preparing your dashboard..." />;
+  }
+
+  if (!session) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!profile?.role) {
+    return <AccessDenied message="Access denied: role is missing." />;
+  }
+
+  return <Navigate to={roleDashboardPath(profile.role)} replace />;
+}
+
+function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<RootRedirect />} />
+      <Route path="/login" element={<AuthPage mode="login" />} />
+      <Route path="/signup" element={<AuthPage mode="signup" />} />
+      <Route
+        path="/dashboard/student"
+        element={
+          <RequireSession>
+            <RoleGuard allowedRoles={["student", "admin"]}>
+              <DashboardPage variant="student" />
+            </RoleGuard>
+          </RequireSession>
+        }
+      />
+      <Route
+        path="/dashboard/parent"
+        element={
+          <RequireSession>
+            <RoleGuard allowedRoles={["parent", "admin"]}>
+              <DashboardPage variant="parent" />
+            </RoleGuard>
+          </RequireSession>
+        }
+      />
+      <Route
+        path="/dashboard/staff"
+        element={
+          <RequireSession>
+            <RoleGuard allowedRoles={["professor", "ta", "admin"]}>
+              <DashboardPage variant="staff" />
+            </RoleGuard>
+          </RequireSession>
+        }
+      />
+      <Route path="/access-denied" element={<AccessDenied />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
+
+export default App;
