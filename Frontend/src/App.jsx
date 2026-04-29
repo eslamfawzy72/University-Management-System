@@ -156,6 +156,10 @@ function App() {
             <RoleGuard allowedRoles={["admin", "professor", "ta", "student"]}>
               <AssignmentsPage />
             </RoleGuard>
+          </RequireSession>
+        }
+      />
+      <Route
         path="/announcements"
         element={
           <RequireSession>
