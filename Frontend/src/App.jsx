@@ -14,10 +14,24 @@ import AssignmentsPage from "./pages/curriculum/AssignmentsPage";
 function FullscreenState({ title, message }) {
   return (
     <section className="fullscreen-state">
+      <div className="fullscreen-state__aurora fullscreen-state__aurora--blue" />
+      <div className="fullscreen-state__aurora fullscreen-state__aurora--gold" />
       <div className="fullscreen-state__card">
+        <div className="fullscreen-state__status">
+          <span className="fullscreen-state__pulse" aria-hidden="true" />
+          <span>Secure session check</span>
+        </div>
         <p className="eyebrow">UniSystem</p>
         <h1>{title}</h1>
         <p>{message}</p>
+        <div className="fullscreen-state__progress" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </div>
+        <small className="fullscreen-state__caption">
+          Restoring your workspace and permissions.
+        </small>
       </div>
     </section>
   );
