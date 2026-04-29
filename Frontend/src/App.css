@@ -327,6 +327,258 @@ img {
 .content-card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
 .feature-list { margin: 16px 0 0; padding-left: 18px; color: var(--text); display: grid; gap: 10px; }
 
+/* ── Curriculum / shared page utilities ────────────────────────────────── */
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.text-muted { color: var(--text-muted); font-size: 14px; }
+.text-danger { color: var(--danger); }
+.error-msg { color: var(--danger); font-size: 13px; padding: 10px 0; margin: 0; }
+.empty-state { color: var(--text-muted); font-size: 13px; margin-top: 16px; }
+
+.code-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--navy-light);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* ── Data table ──────────────────────────────────────────────────────────── */
+
+.table-wrap { overflow-x: auto; margin-top: 16px; }
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.data-table th {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-light);
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.data-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tbody tr:hover td { background: var(--surface); }
+
+.col-name { font-weight: 500; max-width: 280px; }
+
+.actions-cell {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  white-space: nowrap;
+}
+
+/* ── Button variants ─────────────────────────────────────────────────────── */
+
+.btn-xs {
+  min-height: 30px;
+  padding: 0.3rem 0.75rem;
+  font-size: 12px;
+}
+
+.btn-ghost-danger { color: var(--danger); border-color: rgba(231, 76, 60, 0.2); }
+.btn-ghost-danger:hover:not(:disabled) { background: var(--danger-soft); border-color: rgba(231, 76, 60, 0.4); }
+
+.btn-danger { background: var(--danger); color: var(--white); }
+.btn-danger:hover:not(:disabled) { background: #c0392b; }
+
+/* ── Modal ───────────────────────────────────────────────────────────────── */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(13, 27, 62, 0.45);
+  backdrop-filter: blur(4px);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  z-index: 100;
+}
+
+.modal {
+  width: min(540px, 100%);
+  background: var(--white);
+  border-radius: 16px;
+  box-shadow: var(--shadow-md);
+  padding: 28px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal--sm { width: min(400px, 100%); }
+
+.modal__title {
+  font-size: 18px !important;
+  font-weight: 600 !important;
+  color: var(--navy) !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  margin-bottom: 4px;
+}
+
+.modal__body { color: var(--text-muted); font-size: 14px; margin-top: 10px; }
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+/* ── Form utilities ──────────────────────────────────────────────────────── */
+
+.form-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.field textarea {
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--white);
+  color: var(--text);
+  padding: 0.85rem 0.95rem;
+  outline: none;
+  resize: vertical;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.field textarea:focus {
+  border-color: rgba(59, 127, 234, 0.45);
+  box-shadow: 0 0 0 4px rgba(59, 127, 234, 0.1);
+}
+
+.field-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.field-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.file-input {
+  width: 100%;
+  padding: 8px 0;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+/* ── Materials page ──────────────────────────────────────────────────────── */
+
+.course-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.course-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 160ms ease, color 160ms ease, background-color 160ms ease;
+}
+
+.course-tab:hover { border-color: var(--accent); color: var(--accent); }
+
+.course-tab--active {
+  background: var(--accent-soft);
+  border-color: rgba(59, 127, 234, 0.3);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.upload-form { margin-top: 16px; display: grid; gap: 14px; }
+
+.file-list { display: grid; gap: 0; margin-top: 16px; }
+
+.file-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.file-item:last-child { border-bottom: none; }
+.file-icon { font-size: 22px; flex-shrink: 0; }
+
+.file-info { flex: 1; min-width: 0; }
+
+.file-info strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-info span { display: block; font-size: 12px; margin-top: 2px; }
+.file-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+/* ── Sidebar label ───────────────────────────────────────────────────────── */
+
+.sidebar-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+  padding: 0 0.95rem;
+  margin-top: 16px;
+  margin-bottom: 4px;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+
 @media (max-width: 960px) {
   .auth-layout { grid-template-columns: 1fr; }
   .auth-hero { padding: 0; }
@@ -338,6 +590,11 @@ img {
 }
 
 @media (max-width: 640px) {
+  .form-row-2 { grid-template-columns: 1fr; }
+  .modal { padding: 20px; }
+  .data-table th,
+  .data-table td { padding: 8px; }
+
   .auth-page,
   .app-shell__content,
   .topbar {

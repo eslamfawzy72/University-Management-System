@@ -39,6 +39,21 @@ export default function AppShell({ title, subtitle, children }) {
             <NavLink className="sidebar-nav__link" to={homePath} end>
               Dashboard
             </NavLink>
+
+            {role !== "parent" && (
+              <>
+                <p className="sidebar-label">Curriculum</p>
+                <NavLink className="sidebar-nav__link" to="/curriculum/courses">
+                  Courses
+                </NavLink>
+                <NavLink className="sidebar-nav__link" to="/curriculum/materials">
+                  Materials
+                </NavLink>
+                <NavLink className="sidebar-nav__link" to="/curriculum/assignments">
+                  Assignments
+                </NavLink>
+              </>
+            )}
           </nav>
         </div>
 
