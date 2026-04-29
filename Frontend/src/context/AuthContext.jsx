@@ -71,8 +71,6 @@ export function AuthProvider({ children }) {
     const nextProfile = await readProfile(nextSession.user.id);
 
     if (!nextProfile?.role) {
-      await supabase.auth.signOut();
-      setSession(null);
       setProfile(null);
       setLoading(false);
       throw new Error("Access denied: role is missing");
@@ -114,8 +112,6 @@ export function AuthProvider({ children }) {
       try {
         await syncSession(currentSession);
       } catch (authError) {
-        setSession(null);
-        setProfile(null);
         setLoading(false);
         console.error(authError);
       }
@@ -135,8 +131,6 @@ export function AuthProvider({ children }) {
       try {
         await syncSession(nextSession);
       } catch (authError) {
-        setSession(null);
-        setProfile(null);
         setLoading(false);
         console.error(authError);
       }
