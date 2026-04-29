@@ -39,6 +39,9 @@ export default function AppShell({ title, subtitle, children }) {
             <NavLink className="sidebar-nav__link" to={homePath} end>
               Dashboard
             </NavLink>
+            <NavLink className="sidebar-nav__link" to="/announcements">
+              Announcements
+            </NavLink>
           </nav>
         </div>
 

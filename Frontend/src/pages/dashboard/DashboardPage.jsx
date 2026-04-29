@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 import AppShell from "../../components/layout/AppShell";
 import { useAuth } from "../../hooks/useAuth";
 import { roleChipClass, roleLabel } from "../../lib/roles";
@@ -75,6 +77,17 @@ export default function DashboardPage({ variant }) {
             {copy.highlights.map((item) => (
               <li key={item}>{item}</li>
             ))}
+          </ul>
+        </article>
+
+        <article className="content-card">
+          <h2>Quick links</h2>
+          <ul className="feature-list">
+            <li>
+              <Link to="/announcements" className="text-link">
+                View university announcements →
+              </Link>
+            </li>
           </ul>
         </article>
       </section>
