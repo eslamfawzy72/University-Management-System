@@ -6,6 +6,7 @@ import { useRole } from "./hooks/useRole";
 import { roleDashboardPath } from "./lib/roles";
 import AccessDenied from "./pages/AccessDenied";
 import AuthPage from "./pages/auth/AuthPage";
+import AnnouncementsPage from "./pages/announcements/AnnouncementsPage";
 import DashboardPage from "./pages/dashboard/DashboardPage";
 
 function FullscreenState({ title, message }) {
@@ -122,6 +123,14 @@ function App() {
             <RoleGuard allowedRoles={["professor", "ta", "admin"]}>
               <DashboardPage variant="staff" />
             </RoleGuard>
+          </RequireSession>
+        }
+      />
+      <Route
+        path="/announcements"
+        element={
+          <RequireSession>
+            <AnnouncementsPage />
           </RequireSession>
         }
       />
