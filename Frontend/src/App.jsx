@@ -8,6 +8,9 @@ import AccessDenied from "./pages/AccessDenied";
 import AuthPage from "./pages/auth/AuthPage";
 import AnnouncementsPage from "./pages/announcements/AnnouncementsPage";
 import DashboardPage from "./pages/dashboard/DashboardPage";
+import CoursesPage from "./pages/curriculum/CoursesPage";
+import MaterialsPage from "./pages/curriculum/MaterialsPage";
+import AssignmentsPage from "./pages/curriculum/AssignmentsPage";
 
 function FullscreenState({ title, message }) {
   return (
@@ -127,6 +130,32 @@ function App() {
         }
       />
       <Route
+        path="/curriculum/courses"
+        element={
+          <RequireSession>
+            <RoleGuard allowedRoles={["admin", "professor", "ta", "student"]}>
+              <CoursesPage />
+            </RoleGuard>
+          </RequireSession>
+        }
+      />
+      <Route
+        path="/curriculum/materials"
+        element={
+          <RequireSession>
+            <RoleGuard allowedRoles={["admin", "professor", "ta", "student"]}>
+              <MaterialsPage />
+            </RoleGuard>
+          </RequireSession>
+        }
+      />
+      <Route
+        path="/curriculum/assignments"
+        element={
+          <RequireSession>
+            <RoleGuard allowedRoles={["admin", "professor", "ta", "student"]}>
+              <AssignmentsPage />
+            </RoleGuard>
         path="/announcements"
         element={
           <RequireSession>
