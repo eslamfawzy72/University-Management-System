@@ -77,7 +77,7 @@ export default function AppShell({ title, subtitle, children }) {
 
             {role !== "parent" && (
               <>
-                <p className="sidebar-label">Curriculum</p>
+                
                 <NavLink className="sidebar-nav__link" to="/curriculum/courses">
                   Courses
                 </NavLink>
