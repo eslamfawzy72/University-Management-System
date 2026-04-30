@@ -11,6 +11,7 @@ import DashboardPage from "./pages/dashboard/DashboardPage";
 import CoursesPage from "./pages/curriculum/CoursesPage";
 import MaterialsPage from "./pages/curriculum/MaterialsPage";
 import AssignmentsPage from "./pages/curriculum/AssignmentsPage";
+import MessagesPage from "./pages/messages/MessagesPage";
 
 function FullscreenState({ title, message }) {
   return (
@@ -164,6 +165,16 @@ function App() {
         element={
           <RequireSession>
             <AnnouncementsPage />
+          </RequireSession>
+        }
+      />
+      <Route
+        path="/messages"
+        element={
+          <RequireSession>
+            <RoleGuard allowedRoles={["student", "professor", "ta", "admin"]}>
+              <MessagesPage />
+            </RoleGuard>
           </RequireSession>
         }
       />

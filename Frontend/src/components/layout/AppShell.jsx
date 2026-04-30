@@ -1,13 +1,47 @@
+import { useEffect, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 
 import { BtnGhost } from "../ui/Buttons";
 import { useAuth } from "../../hooks/useAuth";
 import { useRole } from "../../hooks/useRole";
 import { roleDashboardPath, roleChipClass, roleLabel } from "../../lib/roles";
+import { supabase } from "../../lib/supabase";
+
+function InboxButton({ authUserId }) {
+  const [unread, setUnread] = useState(0);
+
+  useEffect(() => {
+    if (!authUserId) return;
+
+    async function fetchUnread() {
+      const { count } = await supabase
+        .from("messages")
+        .select("id", { count: "exact", head: true })
+        .eq("receiver_id", authUserId)
+        .eq("is_read", false);
+      setUnread(count ?? 0);
+    }
+
+    fetchUnread();
+  }, [authUserId]);
+
+  return (
+    <Link to="/messages" className="topbar-inbox">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+        <polyline points="22,6 12,13 2,6" />
+      </svg>
+      <span>Inbox</span>
+      {unread > 0 && (
+        <span className="topbar-inbox__badge">{unread > 99 ? "99+" : unread}</span>
+      )}
+    </Link>
+  );
+}
 
 export default function AppShell({ title, subtitle, children }) {
   const navigate = useNavigate();
-  const { profile, signOut } = useAuth();
+  const { profile, session, signOut } = useAuth();
   const { role } = useRole();
 
   const handleSignOut = async () => {
@@ -16,6 +50,7 @@ export default function AppShell({ title, subtitle, children }) {
   };
 
   const homePath = roleDashboardPath(role);
+  const showInbox = role === "student" || role === "professor" || role === "ta" || role === "admin";
 
   return (
     <div className="app-shell">
@@ -71,7 +106,9 @@ export default function AppShell({ title, subtitle, children }) {
             <p className="eyebrow">{roleLabel(role)} access</p>
             <h1>{title}</h1>
           </div>
-          <p className="topbar__subtitle">{subtitle}</p>
+          <div className="topbar__right">
+            {showInbox && <InboxButton authUserId={session?.user?.id} />}
+          </div>
         </header>
 
         <main className="app-shell__content">{children}</main>
