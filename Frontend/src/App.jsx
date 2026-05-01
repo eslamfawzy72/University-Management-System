@@ -9,8 +9,7 @@ import AuthPage from "./pages/auth/AuthPage";
 import AnnouncementsPage from "./pages/announcements/AnnouncementsPage";
 import DashboardPage from "./pages/dashboard/DashboardPage";
 import CoursesPage from "./pages/curriculum/CoursesPage";
-import MaterialsPage from "./pages/curriculum/MaterialsPage";
-import AssignmentsPage from "./pages/curriculum/AssignmentsPage";
+import CourseDetailPage from "./pages/curriculum/CourseDetailPage";
 import MessagesPage from "./pages/messages/MessagesPage";
 
 function FullscreenState({ title, message }) {
@@ -141,21 +140,11 @@ function App() {
         }
       />
       <Route
-        path="/curriculum/materials"
+        path="/curriculum/courses/:id"
         element={
           <RequireSession>
             <RoleGuard allowedRoles={["admin", "professor", "ta", "student"]}>
-              <MaterialsPage />
-            </RoleGuard>
-          </RequireSession>
-        }
-      />
-      <Route
-        path="/curriculum/assignments"
-        element={
-          <RequireSession>
-            <RoleGuard allowedRoles={["admin", "professor", "ta", "student"]}>
-              <AssignmentsPage />
+              <CourseDetailPage />
             </RoleGuard>
           </RequireSession>
         }
