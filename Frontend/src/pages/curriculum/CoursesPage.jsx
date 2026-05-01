@@ -357,7 +357,7 @@ export default function CoursesPage() {
               const isPending = myStatus === "pending";
               const isFull = seats != null && seats <= 0;
               const canEnroll = isStudent && c.is_active && !myStatus && !isFull;
-              const canNavigate = canManage || isEnrolled;
+              const canNavigate = !isStudent || isEnrolled;
               const assigned = courseStaffByCourse[c.id] || [];
               const profRow = assigned.find((r) => r.role === "professor");
               const taRows = assigned.filter((r) => r.role === "ta");
