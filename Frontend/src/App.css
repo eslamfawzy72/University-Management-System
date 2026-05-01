@@ -770,6 +770,67 @@ img {
   outline-offset: 1px;
 }
 
+.grades-summary {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+
+.grades-summary__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.grades-summary__label {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+
+.grades-summary__value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.score-cell {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.grade-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.grade-cell__score {
+  font-weight: 600;
+}
+
+.grade-cell__pct {
+  font-weight: 400;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.grade-cell__feedback {
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+  max-width: 280px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .course-card__staff {
   display: flex;
   flex-direction: column;
