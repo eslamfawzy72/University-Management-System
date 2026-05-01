@@ -102,7 +102,7 @@ export default function AppShell({ title, subtitle, children }) {
               <>
                 <p className="sidebar-label">People</p>
                 <NavLink className="sidebar-nav__link" to="/students">
-                  People &amp; Records
+                  Users
                 </NavLink>
               </>
             )}
