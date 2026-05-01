@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { BtnPrimary, BtnGhost } from "../../components/ui/Buttons";
 import { useAuth } from "../../hooks/useAuth";
 import { roleDashboardPath, roleChipClass } from "../../lib/roles";
+import { supabase } from "../../lib/supabase";
 
 const INITIAL_VALUES = {
   fullName: "",
@@ -42,10 +43,13 @@ export default function AuthPage({ mode }) {
   const isSignup = mode === "signup";
   const navigate = useNavigate();
   const { session, profile, loading, signIn, signUp } = useAuth();
-  const [values, setValues] = useState(INITIAL_VALUES);
-  const [errors, setErrors] = useState({});
-  const [statusMessage, setStatusMessage] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const [values,           setValues]           = useState(INITIAL_VALUES);
+  const [errors,           setErrors]           = useState({});
+  const [statusMessage,    setStatusMessage]    = useState("");
+  const [submitting,       setSubmitting]       = useState(false);
+  const [unconfirmedEmail, setUnconfirmedEmail] = useState("");
+  const [resending,        setResending]        = useState(false);
+  const [resendDone,       setResendDone]       = useState(false);
 
   useEffect(() => {
     if (session && profile?.role) {
@@ -77,6 +81,19 @@ export default function AuthPage({ mode }) {
         return nextErrors;
       });
     }
+
+    // Clear the unconfirmed banner if the user edits the email field
+    if (field === "email") {
+      setUnconfirmedEmail("");
+      setResendDone(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setResending(true);
+    await supabase.auth.resend({ type: "signup", email: unconfirmedEmail });
+    setResending(false);
+    setResendDone(true);
   };
 
   const handleSubmit = async (event) => {
@@ -118,7 +135,12 @@ export default function AuthPage({ mode }) {
 
       navigate(roleDashboardPath(nextProfile.role), { replace: true });
     } catch (error) {
-      setStatusMessage(error.message || "Something went wrong");
+      if (error.message?.toLowerCase().includes("not confirmed")) {
+        setUnconfirmedEmail(values.email.trim());
+        setResendDone(false);
+      } else {
+        setStatusMessage(error.message || "Something went wrong");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -234,6 +256,24 @@ export default function AuthPage({ mode }) {
             ) : null}
 
             {statusMessage ? <div className="form-banner">{statusMessage}</div> : null}
+
+            {unconfirmedEmail && !resendDone && (
+              <div className="form-banner form-banner--warn">
+                <p style={{ marginBottom: 10 }}>
+                  <strong>Email not verified.</strong> Please check your inbox and click the
+                  confirmation link before logging in.
+                </p>
+                <BtnGhost type="button" disabled={resending} onClick={handleResend}>
+                  {resending ? "Sending…" : "Resend confirmation email"}
+                </BtnGhost>
+              </div>
+            )}
+
+            {resendDone && (
+              <div className="form-banner">
+                Confirmation email sent. Check your inbox and click the link, then log in.
+              </div>
+            )}
 
             <BtnPrimary type="submit" className="auth-submit" disabled={submitting}>
               {submitting ? "Please wait..." : isSignup ? "Create account" : "Log in"}
