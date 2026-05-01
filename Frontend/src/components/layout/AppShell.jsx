@@ -4,6 +4,7 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import { BtnGhost } from "../ui/Buttons";
 import { useAuth } from "../../hooks/useAuth";
 import { useRole } from "../../hooks/useRole";
+import { useEnrollment } from "../../hooks/useEnrollment";
 import { roleDashboardPath, roleChipClass, roleLabel } from "../../lib/roles";
 import { supabase } from "../../lib/supabase";
 
@@ -43,6 +44,7 @@ export default function AppShell({ title, subtitle, children }) {
   const navigate = useNavigate();
   const { profile, session, signOut } = useAuth();
   const { role } = useRole();
+  const { enrolled } = useEnrollment();
 
   const handleSignOut = async () => {
     await signOut();
@@ -50,7 +52,8 @@ export default function AppShell({ title, subtitle, children }) {
   };
 
   const homePath = roleDashboardPath(role);
-  const showInbox = role === "student" || role === "professor" || role === "ta" || role === "admin";
+  const isUnregistered = role === "student" && enrolled === false;
+  const showInbox = !isUnregistered && (role === "student" || role === "professor" || role === "ta" || role === "admin");
 
   return (
     <div className="app-shell">
@@ -75,7 +78,7 @@ export default function AppShell({ title, subtitle, children }) {
               Dashboard
             </NavLink>
 
-            {role !== "parent" && (
+            {!isUnregistered && role !== "parent" && (
               <>
                 <p className="sidebar-label">Curriculum</p>
                 <NavLink className="sidebar-nav__link" to="/curriculum/courses">
@@ -86,6 +89,33 @@ export default function AppShell({ title, subtitle, children }) {
                 </NavLink>
                 <NavLink className="sidebar-nav__link" to="/curriculum/assignments">
                   Assignments
+                </NavLink>
+              </>
+            )}
+
+            {(role === "admin" || role === "professor" || role === "ta") && (
+              <>
+                <p className="sidebar-label">Facilities</p>
+                <NavLink className="sidebar-nav__link" to="/facilities">
+                  Rooms &amp; Reservations
+                </NavLink>
+              </>
+            )}
+
+            {role === "admin" && (
+              <>
+                <p className="sidebar-label">Students</p>
+                <NavLink className="sidebar-nav__link" to="/students">
+                  Student Records
+                </NavLink>
+              </>
+            )}
+
+            {(role === "student" || role === "admin") && (
+              <>
+                <p className="sidebar-label">Admissions</p>
+                <NavLink className="sidebar-nav__link" to="/admissions">
+                  {isUnregistered ? "Apply Now" : "Applications"}
                 </NavLink>
               </>
             )}

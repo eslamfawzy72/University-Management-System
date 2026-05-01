@@ -373,6 +373,11 @@ img {
   border: 1px solid rgba(59, 127, 234, 0.15);
 }
 
+.form-banner--warn {
+  background: var(--gold-soft);
+  border-color: rgba(245, 166, 35, 0.3);
+}
+
 .auth-submit { width: 100%; }
 
 .auth-footer {
@@ -710,6 +715,219 @@ img {
   padding: 0 0.95rem;
   margin-top: 16px;
   margin-bottom: 4px;
+}
+
+/* ── Admissions ─────────────────────────────────────────────────────────── */
+
+.admission-filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--border);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 6px;
+}
+
+.course-tab--active .admission-filter-count {
+  background: rgba(59, 127, 234, 0.18);
+  color: var(--accent);
+}
+
+.decision-options {
+  display: flex;
+  gap: 12px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.decision-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border-radius: 8px;
+  border: 2px solid var(--border);
+  cursor: pointer;
+  transition: border-color 160ms ease, background-color 160ms ease;
+  user-select: none;
+}
+
+.decision-option input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.decision-option--approve.is-selected {
+  border-color: var(--success);
+  background: var(--success-soft);
+}
+
+.decision-option--reject.is-selected {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.admission-banner {
+  margin-top: 16px;
+}
+
+.admission-readonly {
+  background: var(--surface) !important;
+  color: var(--text-muted) !important;
+  cursor: default;
+}
+
+.admission-status-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.admission-status-item { display: grid; gap: 8px; }
+.admission-status-item .eyebrow { margin: 0; }
+.admission-status-value { font-size: 14px; font-weight: 500; color: var(--text); margin: 0; }
+
+/* ── Facilities ──────────────────────────────────────────────────────────── */
+
+.facilities-tabs {
+  display: flex;
+  gap: 0;
+}
+
+.facilities-tab {
+  padding: 14px 18px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  transition: color 160ms ease, border-color 160ms ease;
+  white-space: nowrap;
+}
+
+.facilities-tab:hover { color: var(--text); }
+
+.facilities-tab--active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+
+.facilities-filter {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr auto;
+  gap: 14px;
+  margin-top: 14px;
+  align-items: end;
+}
+
+.facilities-filter__btn { display: flex; flex-direction: column; }
+
+.res-time { white-space: nowrap; font-size: 13px; color: var(--text-muted); }
+
+/* ── Students ────────────────────────────────────────────────────────────── */
+
+.students-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.doc-upload-card {
+  border-left: 4px solid var(--gold);
+  background: var(--gold-soft);
+}
+
+.temp-password-box {
+  margin: 20px 0;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.temp-password-box__label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.temp-password-box__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.temp-password-box__code {
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--navy);
+  letter-spacing: 0.06em;
+  flex: 1;
+}
+
+.complete-profile-card {
+  width: 100%;
+  max-width: 460px;
+}
+
+/* ── Recurrence toggle ───────────────────────────────────────────────────── */
+
+.recurrence-toggle {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  width: fit-content;
+}
+
+.recurrence-btn {
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--white);
+  color: var(--text-muted);
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.recurrence-btn:not(:last-child) {
+  border-right: 1px solid var(--border);
+}
+
+.recurrence-btn--active {
+  background: var(--accent);
+  color: var(--white);
+}
+
+.recurrence-btn:hover:not(.recurrence-btn--active) {
+  background: var(--surface);
+  color: var(--text);
 }
 
 /* ── Responsive ─────────────────────────────────────────────────────────── */

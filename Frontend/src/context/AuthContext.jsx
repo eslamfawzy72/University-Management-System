@@ -35,7 +35,7 @@ async function readProfile(userId) {
 
     const profilePromise = supabase
       .from("profiles")
-      .select("id, role, full_name, email, avatar_url")
+      .select("id, role, full_name, email, avatar_url, student_number, must_change_password, is_removed")
       .eq("id", userId)
       .maybeSingle();
 
@@ -74,6 +74,14 @@ export function AuthProvider({ children }) {
       setProfile(null);
       setLoading(false);
       throw new Error("Access denied: role is missing");
+    }
+
+    if (nextProfile?.is_removed) {
+      setSession(null);
+      setProfile(null);
+      setLoading(false);
+      await supabase.auth.signOut();
+      throw new Error("Your account has been deactivated. Please contact the administration.");
     }
 
     setProfile(nextProfile);
@@ -205,6 +213,14 @@ export function AuthProvider({ children }) {
     setProfile(null);
   };
 
+  const refreshProfile = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    const updated = await readProfile(user.id);
+    setProfile(updated);
+    return updated;
+  };
+
   const value = useMemo(
     () => ({
       session,
@@ -213,6 +229,7 @@ export function AuthProvider({ children }) {
       signIn,
       signUp,
       signOut,
+      refreshProfile,
     }),
     [loading, profile, session]
   );

@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import "./App.css";
 import { useAuth } from "./hooks/useAuth";
 import { useRole } from "./hooks/useRole";
+import { useEnrollment } from "./hooks/useEnrollment";
 import { roleDashboardPath } from "./lib/roles";
 import AccessDenied from "./pages/AccessDenied";
 import AuthPage from "./pages/auth/AuthPage";
@@ -12,6 +13,10 @@ import CoursesPage from "./pages/curriculum/CoursesPage";
 import MaterialsPage from "./pages/curriculum/MaterialsPage";
 import AssignmentsPage from "./pages/curriculum/AssignmentsPage";
 import MessagesPage from "./pages/messages/MessagesPage";
+import AdmissionsPage from "./pages/admissions/AdmissionsPage";
+import FacilitiesPage from "./pages/facilities/FacilitiesPage";
+import StudentsPage from "./pages/students/StudentsPage";
+import CompleteProfilePage from "./pages/auth/CompleteProfilePage";
 
 function FullscreenState({ title, message }) {
   return (
@@ -40,10 +45,29 @@ function FullscreenState({ title, message }) {
 }
 
 function RequireSession({ children }) {
-  const { loading, session } = useAuth();
+  const { loading, session, profile } = useAuth();
 
   if (loading) {
     return <FullscreenState title="Loading session" message="Checking your Supabase login state..." />;
+  }
+
+  if (!session) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (profile?.must_change_password) {
+    return <Navigate to="/complete-profile" replace />;
+  }
+
+  return children;
+}
+
+// Lighter guard used only for /complete-profile so it doesn't redirect to itself
+function RequireSessionOnly({ children }) {
+  const { loading, session } = useAuth();
+
+  if (loading) {
+    return <FullscreenState title="Loading session" message="Checking your login state..." />;
   }
 
   if (!session) {
@@ -76,6 +100,16 @@ function RoleGuard({ allowedRoles, children }) {
   return children;
 }
 
+function RequireEnrolled({ children }) {
+  const { role } = useRole();
+  const { enrolled, loading } = useEnrollment();
+
+  if (role !== "student") return children;
+  if (loading) return <FullscreenState title="Checking enrollment" message="Verifying your student record…" />;
+  if (!enrolled) return <Navigate to="/dashboard/student" replace />;
+  return children;
+}
+
 function RootRedirect() {
   const { loading, session, profile } = useAuth();
 
@@ -85,6 +119,10 @@ function RootRedirect() {
 
   if (!session) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (profile?.must_change_password) {
+    return <Navigate to="/complete-profile" replace />;
   }
 
   if (!profile?.role) {
@@ -135,7 +173,9 @@ function App() {
         element={
           <RequireSession>
             <RoleGuard allowedRoles={["admin", "professor", "ta", "student"]}>
-              <CoursesPage />
+              <RequireEnrolled>
+                <CoursesPage />
+              </RequireEnrolled>
             </RoleGuard>
           </RequireSession>
         }
@@ -145,7 +185,9 @@ function App() {
         element={
           <RequireSession>
             <RoleGuard allowedRoles={["admin", "professor", "ta", "student"]}>
-              <MaterialsPage />
+              <RequireEnrolled>
+                <MaterialsPage />
+              </RequireEnrolled>
             </RoleGuard>
           </RequireSession>
         }
@@ -155,7 +197,9 @@ function App() {
         element={
           <RequireSession>
             <RoleGuard allowedRoles={["admin", "professor", "ta", "student"]}>
-              <AssignmentsPage />
+              <RequireEnrolled>
+                <AssignmentsPage />
+              </RequireEnrolled>
             </RoleGuard>
           </RequireSession>
         }
@@ -173,9 +217,49 @@ function App() {
         element={
           <RequireSession>
             <RoleGuard allowedRoles={["student", "professor", "ta", "admin"]}>
-              <MessagesPage />
+              <RequireEnrolled>
+                <MessagesPage />
+              </RequireEnrolled>
             </RoleGuard>
           </RequireSession>
+        }
+      />
+      <Route
+        path="/facilities"
+        element={
+          <RequireSession>
+            <RoleGuard allowedRoles={["admin", "professor", "ta"]}>
+              <FacilitiesPage />
+            </RoleGuard>
+          </RequireSession>
+        }
+      />
+      <Route
+        path="/students"
+        element={
+          <RequireSession>
+            <RoleGuard allowedRoles={["admin"]}>
+              <StudentsPage />
+            </RoleGuard>
+          </RequireSession>
+        }
+      />
+      <Route
+        path="/admissions"
+        element={
+          <RequireSession>
+            <RoleGuard allowedRoles={["student", "admin"]}>
+              <AdmissionsPage />
+            </RoleGuard>
+          </RequireSession>
+        }
+      />
+      <Route
+        path="/complete-profile"
+        element={
+          <RequireSessionOnly>
+            <CompleteProfilePage />
+          </RequireSessionOnly>
         }
       />
       <Route path="/access-denied" element={<AccessDenied />} />
