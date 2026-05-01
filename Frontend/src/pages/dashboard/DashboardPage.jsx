@@ -78,16 +78,46 @@ function DocumentUploadBanner({ profileId }) {
 
   useEffect(() => {
     if (!profileId) return;
-    supabase
-      .from("admission_applications")
-      .select("id, documents_url")
-      .eq("applicant_id", profileId)
-      .eq("status", "approved")
-      .maybeSingle()
-      .then(({ data }) => { setApp(data ?? null); setLoading(false); });
+
+    async function load() {
+      const { data } = await supabase
+        .from("admission_applications")
+        .select("id, documents_url")
+        .eq("applicant_id", profileId)
+        .eq("status", "approved")
+        .maybeSingle();
+
+      if (!data || data.documents_url) { setApp(null); setLoading(false); return; }
+
+      // No document on record. For admin-created students the DB update can
+      // silently fail if the RLS policy doesn't grant students UPDATE on this
+      // table. Check storage directly so the banner doesn't keep reappearing
+      // after a successful upload.
+      const { data: files } = await supabase.storage
+        .from("admission-docs")
+        .list(profileId, { limit: 1 });
+
+      if (files?.length) {
+        // File already in storage – try to sync URL back to the DB (best-effort;
+        // may silently fail under restrictive RLS, but the banner stays hidden).
+        const { data: { publicUrl } } = supabase.storage
+          .from("admission-docs")
+          .getPublicUrl(`${profileId}/${files[0].name}`);
+        await supabase
+          .from("admission_applications")
+          .update({ documents_url: publicUrl })
+          .eq("id", data.id);
+        setApp(null);
+      } else {
+        setApp(data);
+      }
+      setLoading(false);
+    }
+
+    load();
   }, [profileId]);
 
-  if (loading || !app || app.documents_url || uploaded) return null;
+  if (loading || !app || uploaded) return null;
 
   async function handleUpload(e) {
     e.preventDefault();
@@ -112,6 +142,8 @@ function DocumentUploadBanner({ profileId }) {
 
     setUploading(false);
     if (updateErr) { setDocError(updateErr.message); return; }
+    // If the update silently returned 0 rows (RLS gap), the file is still in
+    // storage and will be detected on next load via storage.list().
     setUploaded(true);
   }
 

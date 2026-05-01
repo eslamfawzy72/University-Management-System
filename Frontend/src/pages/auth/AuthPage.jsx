@@ -50,6 +50,7 @@ export default function AuthPage({ mode }) {
   const [unconfirmedEmail, setUnconfirmedEmail] = useState("");
   const [resending,        setResending]        = useState(false);
   const [resendDone,       setResendDone]       = useState(false);
+  const [resendError,      setResendError]      = useState("");
 
   useEffect(() => {
     if (session && profile?.role) {
@@ -86,14 +87,26 @@ export default function AuthPage({ mode }) {
     if (field === "email") {
       setUnconfirmedEmail("");
       setResendDone(false);
+      setResendError("");
     }
   };
 
   const handleResend = async () => {
     setResending(true);
-    await supabase.auth.resend({ type: "signup", email: unconfirmedEmail });
-    setResending(false);
-    setResendDone(true);
+    setResendError("");
+    try {
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email: unconfirmedEmail,
+        options: { emailRedirectTo: `${window.location.origin}/login` },
+      });
+      if (error) setResendError(error.message || "Failed to resend. Please try again.");
+      else setResendDone(true);
+    } catch {
+      setResendError("Something went wrong. Please try again.");
+    } finally {
+      setResending(false);
+    }
   };
 
   const handleSubmit = async (event) => {
@@ -101,6 +114,7 @@ export default function AuthPage({ mode }) {
     setStatusMessage("");
     setUnconfirmedEmail("");
     setResendDone(false);
+    setResendError("");
 
     const nextErrors = validate(mode, values);
     setErrors(nextErrors);
@@ -271,12 +285,16 @@ export default function AuthPage({ mode }) {
               <div className="form-banner form-banner--warn">
                 <p style={{ marginBottom: 10 }}>
                   {statusMessage
-                    ? <><strong>Login failed.</strong> {statusMessage}. If your account was
-                        just added by an admin, you also need to confirm your email before
-                        your first login — check your inbox for the confirmation link.</>
+                    ? <><strong>Login failed.</strong> {statusMessage}. You need confirm your email before
+                        if not done yet — check your inbox for the confirmation link.</>
                     : <><strong>Email not verified.</strong> Please check your inbox and click
                         the confirmation link before logging in.</>}
                 </p>
+                {resendError && (
+                  <small style={{ display: "block", color: "var(--danger)", marginBottom: 8 }}>
+                    {resendError}
+                  </small>
+                )}
                 <BtnGhost type="button" disabled={resending} onClick={handleResend}>
                   {resending ? "Sending…" : "Resend confirmation email"}
                 </BtnGhost>
