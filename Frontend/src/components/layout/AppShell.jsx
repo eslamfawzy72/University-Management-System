@@ -78,7 +78,7 @@ export default function AppShell({ title, subtitle, children }) {
               Dashboard
             </NavLink>
 
-            {!isUnregistered && role !== "parent" && (
+            {role !== "parent" && (
               <>
                 
                 <NavLink className="sidebar-nav__link" to="/curriculum/courses">

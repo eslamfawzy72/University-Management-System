@@ -174,9 +174,7 @@ function App() {
         element={
           <RequireSession>
             <RoleGuard allowedRoles={["admin", "professor", "ta", "student"]}>
-              <RequireEnrolled>
-                <CoursesPage />
-              </RequireEnrolled>
+              <CoursesPage />
             </RoleGuard>
           </RequireSession>
         }
