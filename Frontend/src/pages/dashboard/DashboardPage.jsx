@@ -7,6 +7,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { useEnrollment } from "../../hooks/useEnrollment";
 import { roleChipClass, roleLabel } from "../../lib/roles";
 import { supabase } from "../../lib/supabase";
+import TaAssignedCoursesPanel from "./TaAssignedCoursesPanel";
 
 const DASHBOARD_COPY = {
   student: {
@@ -265,9 +266,14 @@ export default function DashboardPage({ variant }) {
 
   const copy = DASHBOARD_COPY[variant];
   const currentRole = profile?.role ?? variant;
+  const isTaDashboard = variant === "staff" && currentRole === "ta";
+  const title = isTaDashboard ? "TA dashboard" : copy.title;
+  const subtitle = isTaDashboard
+    ? "Review your assigned courses and current responsibilities."
+    : copy.subtitle;
 
   return (
-    <AppShell title={copy.title} subtitle={copy.subtitle}>
+    <AppShell title={title} subtitle={subtitle}>
       <section className="dashboard-stack">
         <div className="chip-row">
           <span className={`chip ${roleChipClass(currentRole)}`}>{roleLabel(currentRole)}</span>
@@ -276,30 +282,55 @@ export default function DashboardPage({ variant }) {
 
         {variant === "student" && <DocumentUploadBanner profileId={profile?.id} />}
 
-        <div className="summary-grid">
-          {copy.summary.map((item) => (
-            <article key={item.label} className="summary-card">
-              <span>{item.label}</span>
-              <strong>{item.value}</strong>
-            </article>
-          ))}
-        </div>
+        {isTaDashboard ? (
+          <TaAssignedCoursesPanel />
+        ) : (
+          <>
+            <div className="summary-grid">
+              {copy.summary.map((item) => (
+                <article key={item.label} className="summary-card">
+                  <span>{item.label}</span>
+                  <strong>{item.value}</strong>
+                </article>
+              ))}
+            </div>
 
-        <article className="content-card">
-          <h2>What you can do here</h2>
-          <ul className="feature-list">
-            {copy.highlights.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </article>
+            <article className="content-card">
+              <h2>What you can do here</h2>
+              <ul className="feature-list">
+                {copy.highlights.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </article>
+          </>
+        )}
 
         <article className="content-card">
           <h2>Quick links</h2>
           <ul className="feature-list">
+            {isTaDashboard && (
+              <>
+                <li>
+                  <Link to="/curriculum/courses" className="text-link">
+                    Review assigned course details
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/curriculum/assignments" className="text-link">
+                    Check assignment workload
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/curriculum/materials" className="text-link">
+                    Open teaching materials
+                  </Link>
+                </li>
+              </>
+            )}
             <li>
               <Link to="/announcements" className="text-link">
-                View university announcements →
+                View university announcements
               </Link>
             </li>
           </ul>

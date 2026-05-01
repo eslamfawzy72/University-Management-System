@@ -467,6 +467,115 @@ img {
 .content-card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
 .feature-list { margin: 16px 0 0; padding-left: 18px; color: var(--text); display: grid; gap: 10px; }
 
+.ta-profile-card {
+  display: grid;
+  gap: 20px;
+}
+
+.ta-profile-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ta-profile-card__header h2 {
+  margin-top: 8px;
+  font-size: 20px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--navy);
+}
+
+.ta-profile-card__message {
+  margin: 0;
+}
+
+.ta-empty-state {
+  display: grid;
+  gap: 8px;
+}
+
+.ta-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ta-meta-grid--compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ta-meta-item {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.ta-meta-item span {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-light);
+}
+
+.ta-meta-item strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.ta-assignment-list {
+  display: grid;
+  gap: 16px;
+}
+
+.ta-assignment-card {
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background:
+    radial-gradient(circle at top right, rgba(59, 127, 234, 0.06), transparent 28%),
+    var(--white);
+}
+
+.ta-assignment-card__header {
+  display: grid;
+  gap: 10px;
+}
+
+.ta-assignment-card__title {
+  font-size: 18px;
+  line-height: 1.25;
+  color: var(--navy);
+}
+
+.ta-assignment-card__subtitle {
+  margin: 0;
+}
+
+.ta-assignment-card__tasks {
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.ta-assignment-card__tasks h4 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
 /* ── Curriculum / shared page utilities ────────────────────────────────── */
 
 .page-header {
@@ -1214,6 +1323,8 @@ img {
   .app-shell { grid-template-columns: 1fr; }
   .app-shell__sidebar { min-height: auto; gap: 20px; }
   .summary-grid { grid-template-columns: 1fr; }
+  .ta-meta-grid,
+  .ta-meta-grid--compact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .topbar { flex-direction: column; align-items: flex-start; }
   .topbar__subtitle { text-align: left; }
 }
@@ -1223,6 +1334,9 @@ img {
   .modal { padding: 20px; }
   .data-table th,
   .data-table td { padding: 8px; }
+  .ta-profile-card__header { flex-direction: column; }
+  .ta-meta-grid,
+  .ta-meta-grid--compact { grid-template-columns: 1fr; }
 
   .auth-page,
   .app-shell__content,
