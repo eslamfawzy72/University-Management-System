@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import { supabase } from "../../lib/supabase";
+import { roleDashboardPath } from "../../lib/roles";
 import { BtnPrimary } from "../../components/ui/Buttons";
 
 export default function CompleteProfilePage() {
@@ -51,9 +52,9 @@ export default function CompleteProfilePage() {
     if (profileErr) { setError(profileErr.message); setSubmitting(false); return; }
 
     // Refresh context so RequireSession no longer redirects here
-    await refreshProfile();
+    const updated = await refreshProfile();
 
-    navigate("/dashboard/student", { replace: true });
+    navigate(roleDashboardPath(updated?.role ?? "student"), { replace: true });
   }
 
   return (

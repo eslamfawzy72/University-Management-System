@@ -99,6 +99,8 @@ export default function AuthPage({ mode }) {
   const handleSubmit = async (event) => {
     event.preventDefault();
     setStatusMessage("");
+    setUnconfirmedEmail("");
+    setResendDone(false);
 
     const nextErrors = validate(mode, values);
     setErrors(nextErrors);
@@ -135,9 +137,15 @@ export default function AuthPage({ mode }) {
 
       navigate(roleDashboardPath(nextProfile.role), { replace: true });
     } catch (error) {
-      if (error.message?.toLowerCase().includes("not confirmed")) {
+      const msg = error.message?.toLowerCase() ?? "";
+      if (msg.includes("not confirmed")) {
+        // Old Supabase: explicit "Email not confirmed" error
         setUnconfirmedEmail(values.email.trim());
-        setResendDone(false);
+      } else if (!isSignup) {
+        // Supabase v2 returns "invalid login credentials" for BOTH wrong password
+        // and unconfirmed email — always surface the resend option on login failures
+        setStatusMessage(error.message || "Something went wrong");
+        setUnconfirmedEmail(values.email.trim());
       } else {
         setStatusMessage(error.message || "Something went wrong");
       }
@@ -255,13 +263,19 @@ export default function AuthPage({ mode }) {
               </label>
             ) : null}
 
-            {statusMessage ? <div className="form-banner">{statusMessage}</div> : null}
+            {statusMessage && !unconfirmedEmail
+              ? <div className="form-banner">{statusMessage}</div>
+              : null}
 
             {unconfirmedEmail && !resendDone && (
               <div className="form-banner form-banner--warn">
                 <p style={{ marginBottom: 10 }}>
-                  <strong>Email not verified.</strong> Please check your inbox and click the
-                  confirmation link before logging in.
+                  {statusMessage
+                    ? <><strong>Login failed.</strong> {statusMessage}. If your account was
+                        just added by an admin, you also need to confirm your email before
+                        your first login — check your inbox for the confirmation link.</>
+                    : <><strong>Email not verified.</strong> Please check your inbox and click
+                        the confirmation link before logging in.</>}
                 </p>
                 <BtnGhost type="button" disabled={resending} onClick={handleResend}>
                   {resending ? "Sending…" : "Resend confirmation email"}
