@@ -14,6 +14,8 @@ const EMPTY_FORM = {
   capacity: "",
   department_id: "",
   is_active: true,
+  professor_staff_id: "",
+  ta_staff_ids: [],
 };
 
 export default function CoursesPage() {
@@ -25,6 +27,8 @@ export default function CoursesPage() {
 
   const [courses, setCourses] = useState([]);
   const [departments, setDepartments] = useState([]);
+  const [staffOptions, setStaffOptions] = useState([]);
+  const [courseStaffByCourse, setCourseStaffByCourse] = useState({});
   const [enrollmentStatuses, setEnrollmentStatuses] = useState({});
   const [enrolledCounts, setEnrolledCounts] = useState({});
   const [studentId, setStudentId] = useState(null);
@@ -36,20 +40,57 @@ export default function CoursesPage() {
   const [deleteId, setDeleteId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [formError, setFormError] = useState("");
+
+  const professorOptions = staffOptions.filter((s) => s.role === "professor");
+  const taOptions = staffOptions.filter((s) => s.role === "ta");
+
+  function staffNameById(staffId) {
+    const match = staffOptions.find((s) => s.id === staffId);
+    return match ? match.full_name : null;
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
 
-    const [{ data: c, error: cErr }, { data: d, error: dErr }] = await Promise.all([
+    const [
+      { data: c, error: cErr },
+      { data: d, error: dErr },
+      { data: staffRows, error: sErr },
+      { data: csRows, error: csErr },
+    ] = await Promise.all([
       supabase.from("courses").select("*, departments(name)").order("code"),
       supabase.from("departments").select("id, name").order("name"),
+      supabase.from("staff").select("id, profile_id, title, profiles(id, full_name, email, role)"),
+      supabase.from("course_staff").select("id, course_id, staff_id, role"),
     ]);
 
-    if (cErr || dErr) { setError((cErr || dErr).message); setLoading(false); return; }
+    const firstErr = cErr || dErr || sErr || csErr;
+    if (firstErr) { setError(firstErr.message); setLoading(false); return; }
 
     setCourses(c || []);
     setDepartments(d || []);
+
+    const mappedStaff = (staffRows || [])
+      .filter((s) => s.profiles && (s.profiles.role === "professor" || s.profiles.role === "ta"))
+      .map((s) => ({
+        id: s.id,
+        profile_id: s.profile_id,
+        full_name: s.profiles.full_name,
+        email: s.profiles.email,
+        role: s.profiles.role,
+        title: s.title,
+      }))
+      .sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));
+    setStaffOptions(mappedStaff);
+
+    const grouped = {};
+    for (const row of csRows || []) {
+      if (!grouped[row.course_id]) grouped[row.course_id] = [];
+      grouped[row.course_id].push(row);
+    }
+    setCourseStaffByCourse(grouped);
 
     // Count only enrolled (approved) for seat display
     const { data: allEnrollments } = await supabase
@@ -140,11 +181,15 @@ export default function CoursesPage() {
   function openCreate() {
     setForm(EMPTY_FORM);
     setEditingId(null);
+    setFormError("");
     setModal("form");
   }
 
   function openEdit(e, course) {
     e.stopPropagation();
+    const assigned = courseStaffByCourse[course.id] || [];
+    const professorRow = assigned.find((r) => r.role === "professor");
+    const taRows = assigned.filter((r) => r.role === "ta");
     setForm({
       name: course.name,
       code: course.code,
@@ -153,8 +198,11 @@ export default function CoursesPage() {
       capacity: course.capacity ?? "",
       department_id: course.department_id || "",
       is_active: course.is_active ?? true,
+      professor_staff_id: professorRow?.staff_id || "",
+      ta_staff_ids: taRows.map((r) => r.staff_id),
     });
     setEditingId(course.id);
+    setFormError("");
     setModal("form");
   }
 
@@ -164,19 +212,69 @@ export default function CoursesPage() {
     setModal("delete");
   }
 
+  function toggleTa(staffId) {
+    setForm((f) => {
+      const set = new Set(f.ta_staff_ids);
+      if (set.has(staffId)) set.delete(staffId);
+      else set.add(staffId);
+      return { ...f, ta_staff_ids: [...set] };
+    });
+  }
+
+  async function syncCourseStaff(courseId) {
+    const { error: delErr } = await supabase
+      .from("course_staff")
+      .delete()
+      .eq("course_id", courseId);
+    if (delErr) return delErr;
+
+    const rows = [];
+    if (form.professor_staff_id) {
+      rows.push({ course_id: courseId, staff_id: form.professor_staff_id, role: "professor" });
+    }
+    for (const taId of form.ta_staff_ids) {
+      rows.push({ course_id: courseId, staff_id: taId, role: "ta" });
+    }
+    if (rows.length === 0) return null;
+    const { error: insErr } = await supabase.from("course_staff").insert(rows);
+    return insErr || null;
+  }
+
   async function handleSave(e) {
     e.preventDefault();
     setSaving(true);
+    setFormError("");
+    const {
+      professor_staff_id: _p,
+      ta_staff_ids: _t,
+      ...courseFields
+    } = form;
     const payload = {
-      ...form,
+      ...courseFields,
       capacity: form.capacity !== "" ? Number(form.capacity) : null,
       department_id: form.department_id || null,
     };
-    const { error: err } = editingId
-      ? await supabase.from("courses").update(payload).eq("id", editingId)
-      : await supabase.from("courses").insert(payload);
+
+    let courseId = editingId;
+    if (editingId) {
+      const { error: err } = await supabase.from("courses").update(payload).eq("id", editingId);
+      if (err) { setSaving(false); setFormError(err.message); return; }
+    } else {
+      const { data: inserted, error: err } = await supabase
+        .from("courses")
+        .insert(payload)
+        .select("id")
+        .single();
+      if (err) { setSaving(false); setFormError(err.message); return; }
+      courseId = inserted.id;
+    }
+
+    const staffErr = await syncCourseStaff(courseId);
     setSaving(false);
-    if (err) { alert(err.message); return; }
+    if (staffErr) {
+      setFormError(`Course saved, but staff assignment failed: ${staffErr.message}`);
+      return;
+    }
     setModal(null);
     load();
   }
@@ -224,6 +322,11 @@ export default function CoursesPage() {
               const isFull = seats != null && seats <= 0;
               const canEnroll = isStudent && c.is_active && !myStatus && !isFull;
               const canNavigate = canManage || isEnrolled;
+              const assigned = courseStaffByCourse[c.id] || [];
+              const profRow = assigned.find((r) => r.role === "professor");
+              const taRows = assigned.filter((r) => r.role === "ta");
+              const profName = profRow ? staffNameById(profRow.staff_id) : null;
+              const taNames = taRows.map((r) => staffNameById(r.staff_id)).filter(Boolean);
 
               return (
                 <div
@@ -242,6 +345,25 @@ export default function CoursesPage() {
 
                   {c.description && (
                     <p className="course-card__desc">{c.description}</p>
+                  )}
+
+                  {(profName || taNames.length > 0) && (
+                    <div className="course-card__staff">
+                      {profName && (
+                        <div className="course-card__staff-row">
+                          <span className="course-card__staff-label">Professor</span>
+                          <span className="course-card__staff-value">{profName}</span>
+                        </div>
+                      )}
+                      {taNames.length > 0 && (
+                        <div className="course-card__staff-row">
+                          <span className="course-card__staff-label">
+                            TA{taNames.length > 1 ? "s" : ""}
+                          </span>
+                          <span className="course-card__staff-value">{taNames.join(", ")}</span>
+                        </div>
+                      )}
+                    </div>
                   )}
 
                   <div className="course-card__meta">
@@ -291,6 +413,7 @@ export default function CoursesPage() {
         <div className="modal-overlay" onClick={() => setModal(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h2 className="modal__title">{editingId ? "Edit Course" : "New Course"}</h2>
+            {formError && <p className="error-msg">{formError}</p>}
             <form className="auth-form" onSubmit={handleSave}>
               <div className="form-row-2">
                 <div className="field">
@@ -326,6 +449,48 @@ export default function CoursesPage() {
                   <input type="number" min="1" placeholder="e.g. 30" value={form.capacity} onChange={(e) => field("capacity", e.target.value)} />
                 </div>
               </div>
+              <div className="field">
+                <span>Professor</span>
+                <select
+                  value={form.professor_staff_id}
+                  onChange={(e) => field("professor_staff_id", e.target.value)}
+                >
+                  <option value="">— Unassigned —</option>
+                  {professorOptions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.full_name}{s.email ? ` (${s.email})` : ""}
+                    </option>
+                  ))}
+                </select>
+                {professorOptions.length === 0 && (
+                  <small className="text-muted">
+                    No professors found in the staff directory yet.
+                  </small>
+                )}
+              </div>
+
+              <div className="field">
+                <span>Teaching Assistants</span>
+                {taOptions.length === 0 ? (
+                  <small className="text-muted">
+                    No TAs found in the staff directory yet.
+                  </small>
+                ) : (
+                  <div className="checkbox-list">
+                    {taOptions.map((s) => (
+                      <label key={s.id} className="field-checkbox">
+                        <input
+                          type="checkbox"
+                          checked={form.ta_staff_ids.includes(s.id)}
+                          onChange={() => toggleTa(s.id)}
+                        />
+                        <span>{s.full_name}{s.email ? ` (${s.email})` : ""}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <label className="field-checkbox">
                 <input type="checkbox" checked={form.is_active} onChange={(e) => field("is_active", e.target.checked)} />
                 <span>Active</span>
