@@ -10,8 +10,10 @@ import AuthPage from "./pages/auth/AuthPage";
 import AnnouncementsPage from "./pages/announcements/AnnouncementsPage";
 import DashboardPage from "./pages/dashboard/DashboardPage";
 import CoursesPage from "./pages/curriculum/CoursesPage";
+import CourseDetailPage from "./pages/curriculum/CourseDetailPage";
 import MaterialsPage from "./pages/curriculum/MaterialsPage";
 import AssignmentsPage from "./pages/curriculum/AssignmentsPage";
+import GradesPage from "./pages/curriculum/GradesPage";
 import MessagesPage from "./pages/messages/MessagesPage";
 import AdmissionsPage from "./pages/admissions/AdmissionsPage";
 import FacilitiesPage from "./pages/facilities/FacilitiesPage";
@@ -173,9 +175,17 @@ function App() {
         element={
           <RequireSession>
             <RoleGuard allowedRoles={["admin", "professor", "ta", "student"]}>
-              <RequireEnrolled>
-                <CoursesPage />
-              </RequireEnrolled>
+              <CoursesPage />
+            </RoleGuard>
+          </RequireSession>
+        }
+      />
+      <Route
+        path="/curriculum/courses/:id"
+        element={
+          <RequireSession>
+            <RoleGuard allowedRoles={["admin", "professor", "ta", "student"]}>
+              <CourseDetailPage />
             </RoleGuard>
           </RequireSession>
         }
@@ -200,6 +210,16 @@ function App() {
               <RequireEnrolled>
                 <AssignmentsPage />
               </RequireEnrolled>
+            </RoleGuard>
+          </RequireSession>
+        }
+      />
+      <Route
+        path="/curriculum/grades"
+        element={
+          <RequireSession>
+            <RoleGuard allowedRoles={["admin", "professor", "ta", "student"]}>
+              <GradesPage />
             </RoleGuard>
           </RequireSession>
         }
