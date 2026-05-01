@@ -42,6 +42,11 @@ export default function CoursesPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState("");
 
+  // Search & filter state
+  const [search, setSearch] = useState("");
+  const [filterType, setFilterType] = useState("all");
+  const [filterDept, setFilterDept] = useState("all");
+
   const professorOptions = staffOptions.filter((s) => s.role === "professor");
   const taOptions = staffOptions.filter((s) => s.role === "ta");
 
@@ -296,14 +301,41 @@ export default function CoursesPage() {
     return course.capacity - (enrolledCounts[course.id] || 0);
   }
 
+  const filteredCourses = courses.filter((c) => {
+    if (filterType !== "all" && c.type !== filterType) return false;
+    if (filterDept !== "all" && c.department_id !== filterDept) return false;
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      const haystack = `${c.code} ${c.name} ${c.description ?? ""}`.toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+    return true;
+  });
+
   return (
     <AppShell title="Courses" subtitle="Browse the course catalog">
       <div className="dashboard-stack">
-        {canManage && (
-          <div className="page-header">
-            <BtnPrimary onClick={openCreate}>+ New Course</BtnPrimary>
-          </div>
-        )}
+        <div className="page-header" style={{ flexWrap: "wrap", gap: 8 }}>
+          <input
+            className="search-input"
+            placeholder="Search by code, name, or description…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ flex: 1, minWidth: 220 }}
+          />
+          <select value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+            <option value="all">All types</option>
+            <option value="core">Core</option>
+            <option value="elective">Elective</option>
+          </select>
+          <select value={filterDept} onChange={(e) => setFilterDept(e.target.value)}>
+            <option value="all">All departments</option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </select>
+          {canManage && <BtnPrimary onClick={openCreate}>+ New Course</BtnPrimary>}
+        </div>
 
         {loading && <p className="text-muted">Loading courses…</p>}
         {error && <p className="error-msg">{error}</p>}
@@ -312,9 +344,13 @@ export default function CoursesPage() {
           <p className="empty-state">No courses found. {canManage && "Create your first course above."}</p>
         )}
 
-        {!loading && !error && courses.length > 0 && (
+        {!loading && !error && courses.length > 0 && filteredCourses.length === 0 && (
+          <p className="empty-state">No courses match your search.</p>
+        )}
+
+        {!loading && !error && filteredCourses.length > 0 && (
           <div className="course-grid">
-            {courses.map((c) => {
+            {filteredCourses.map((c) => {
               const seats = availableSeats(c);
               const myStatus = enrollmentStatuses[c.id]; // "pending" | "enrolled" | undefined
               const isEnrolled = myStatus === "enrolled";
