@@ -85,9 +85,10 @@ export default function AssignmentsPage() {
     load();
   }
 
-  const visible = filterCourse === "all"
+  const visible = (canCreate
     ? assignments
-    : assignments.filter((a) => a.course_id === filterCourse);
+    : assignments.filter((a) => a.is_published)
+  ).filter((a) => filterCourse === "all" || a.course_id === filterCourse);
 
   return (
     <AppShell
@@ -144,9 +145,13 @@ export default function AssignmentsPage() {
                           {formatDate(a.due_date)}
                         </td>
                         <td>
-                          {a.is_published
-                            ? <span className="chip chip-green">Published</span>
-                            : <span className="chip chip-gray">Draft</span>}
+                          {!a.is_published ? (
+                            <span className="chip chip-gray">Draft</span>
+                          ) : isPast(a.due_date) ? (
+                            <span className="chip chip-red">Closed</span>
+                          ) : (
+                            <span className="chip chip-green">Open</span>
+                          )}
                         </td>
                         {canCreate && (
                           <td className="actions-cell">
