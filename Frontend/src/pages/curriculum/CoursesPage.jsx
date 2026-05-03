@@ -43,12 +43,14 @@ export default function CoursesPage() {
   const [formError, setFormError] = useState("");
 
   // Search & filter state
-  const [search, setSearch] = useState("");
-  const [filterType, setFilterType] = useState("all");
-  const [filterDept, setFilterDept] = useState("all");
+  const [search,                 setSearch]                 = useState("");
+  const [filterType,             setFilterType]             = useState("all");
+  const [filterDept,             setFilterDept]             = useState("all");
+  const [filterAssigned,         setFilterAssigned]         = useState(false);
+  const [adminAssignedCourseIds, setAdminAssignedCourseIds] = useState(new Set());
 
-  const professorOptions = staffOptions.filter((s) => s.role === "professor");
-  const taOptions = staffOptions.filter((s) => s.role === "ta");
+  const professorOptions = staffOptions.filter((s) => s.role === "professor" || s.role === "admin");
+  const taOptions        = staffOptions.filter((s) => s.role === "ta");
 
   function staffNameById(staffId) {
     const match = staffOptions.find((s) => s.id === staffId);
@@ -64,21 +66,23 @@ export default function CoursesPage() {
       { data: d, error: dErr },
       { data: staffRows, error: sErr },
       { data: csRows, error: csErr },
+      { data: adminProfiles, error: apErr },
     ] = await Promise.all([
       supabase.from("courses").select("*, departments(name)").order("code"),
       supabase.from("departments").select("id, name").order("name"),
       supabase.from("staff").select("id, profile_id, title, profiles(id, full_name, email, role)"),
       supabase.from("course_staff").select("id, course_id, staff_id, role"),
+      supabase.from("profiles").select("id, full_name, email").eq("role", "admin"),
     ]);
 
-    const firstErr = cErr || dErr || sErr || csErr;
+    const firstErr = cErr || dErr || sErr || csErr || apErr;
     if (firstErr) { setError(firstErr.message); setLoading(false); return; }
 
     setCourses(c || []);
     setDepartments(d || []);
 
     const mappedStaff = (staffRows || [])
-      .filter((s) => s.profiles && (s.profiles.role === "professor" || s.profiles.role === "ta"))
+      .filter((s) => s.profiles && (s.profiles.role === "professor" || s.profiles.role === "ta" || s.profiles.role === "admin"))
       .map((s) => ({
         id: s.id,
         profile_id: s.profile_id,
@@ -86,8 +90,25 @@ export default function CoursesPage() {
         email: s.profiles.email,
         role: s.profiles.role,
         title: s.title,
-      }))
-      .sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));
+      }));
+
+    // Admins without a staff row yet get a virtual entry (id prefixed with "v_")
+    // so they appear in the professor dropdown; the real staff row is created on save.
+    const staffedProfileIds = new Set(mappedStaff.map((s) => s.profile_id));
+    for (const ap of (adminProfiles || [])) {
+      if (!staffedProfileIds.has(ap.id)) {
+        mappedStaff.push({
+          id: `v_${ap.id}`,
+          profile_id: ap.id,
+          full_name: ap.full_name,
+          email: ap.email,
+          role: "admin",
+          title: null,
+        });
+      }
+    }
+
+    mappedStaff.sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));
     setStaffOptions(mappedStaff);
 
     const grouped = {};
@@ -108,6 +129,19 @@ export default function CoursesPage() {
       counts[e.course_id] = (counts[e.course_id] || 0) + 1;
     });
     setEnrolledCounts(counts);
+
+    // Admin: load their own course assignments for the "Assigned to me" filter
+    if (canManage && profile?.id) {
+      const { data: myStaffRec } = await supabase
+        .from("staff").select("id").eq("profile_id", profile.id).maybeSingle();
+      if (myStaffRec?.id) {
+        const { data: myAssigned } = await supabase
+          .from("course_staff").select("course_id").eq("staff_id", myStaffRec.id);
+        setAdminAssignedCourseIds(new Set((myAssigned || []).map((r) => r.course_id)));
+      } else {
+        setAdminAssignedCourseIds(new Set());
+      }
+    }
 
     // If student, get their student record + their enrollments with status
     if (isStudent && profile?.id) {
@@ -315,6 +349,7 @@ export default function CoursesPage() {
   const filteredCourses = courses.filter((c) => {
     if (filterType !== "all" && c.type !== filterType) return false;
     if (filterDept !== "all" && c.department_id !== filterDept) return false;
+    if (filterAssigned && !adminAssignedCourseIds.has(c.id)) return false;
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       const haystack = `${c.code} ${c.name} ${c.description ?? ""}`.toLowerCase();
@@ -345,6 +380,16 @@ export default function CoursesPage() {
               <option key={d.id} value={d.id}>{d.name}</option>
             ))}
           </select>
+          {canManage && (
+            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 14, whiteSpace: "nowrap" }}>
+              <input
+                type="checkbox"
+                checked={filterAssigned}
+                onChange={(e) => setFilterAssigned(e.target.checked)}
+              />
+              Assigned to me
+            </label>
+          )}
           {canManage && <BtnPrimary onClick={openCreate}>+ New Course</BtnPrimary>}
         </div>
 

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import AppShell from "../../components/layout/AppShell";
-import { BtnPrimary } from "../../components/ui/Buttons";
+import { BtnPrimary, BtnGhost } from "../../components/ui/Buttons";
 import { useRole } from "../../hooks/useRole";
 import { useAuth } from "../../hooks/useAuth";
 import { supabase } from "../../lib/supabase";
@@ -173,12 +173,14 @@ function StaffGradesView({ profileId, isAdmin }) {
   const [selectedCourseId, setSelectedCourseId] = useState("");
   const [assignments, setAssignments] = useState([]);
   const [selectedAssignmentId, setSelectedAssignmentId] = useState("");
-  const [students, setStudents] = useState([]); // [{ studentId, profileId, fullName, email }]
-  const [grades, setGrades] = useState({}); // studentId -> { id, score, max_score, feedback }
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [savingId, setSavingId] = useState(null);
-  const [saveError, setSaveError] = useState(null);
+  const [students,    setStudents]    = useState([]); // [{ studentId, profileId, fullName, email }]
+  const [grades,      setGrades]      = useState({}); // studentId -> { id, score, max_score, feedback }
+  const [submissions, setSubmissions] = useState({}); // studentId -> { content, submitted_at }
+  const [viewingSub,  setViewingSub]  = useState(null); // { fullName, content, submittedAt }
+  const [loading,     setLoading]     = useState(true);
+  const [error,       setError]       = useState(null);
+  const [savingId,    setSavingId]    = useState(null);
+  const [saveError,   setSaveError]   = useState(null);
 
   // Load courses the user can manage
   const loadCourses = useCallback(async () => {
@@ -241,11 +243,12 @@ function StaffGradesView({ profileId, isAdmin }) {
     return () => { cancelled = true; };
   }, [selectedCourseId]);
 
-  // Load enrolled students + their grades for the selected assignment
+  // Load enrolled students + their grades + submissions for the selected assignment
   useEffect(() => {
     if (!selectedCourseId || !selectedAssignmentId) {
       setStudents([]);
       setGrades({});
+      setSubmissions({});
       return;
     }
     let cancelled = false;
@@ -269,14 +272,25 @@ function StaffGradesView({ profileId, isAdmin }) {
         .sort((a, b) => a.fullName.localeCompare(b.fullName));
       setStudents(studentList);
 
-      const { data: gradeRows } = await supabase
-        .from("assignment_grades")
-        .select("id, student_id, score, max_score, feedback")
-        .eq("assignment_id", selectedAssignmentId);
+      const [{ data: gradeRows }, { data: subRows }] = await Promise.all([
+        supabase
+          .from("assignment_grades")
+          .select("id, student_id, score, max_score, feedback")
+          .eq("assignment_id", selectedAssignmentId),
+        supabase
+          .from("assignment_submissions")
+          .select("student_id, content, submitted_at")
+          .eq("assignment_id", selectedAssignmentId),
+      ]);
       if (cancelled) return;
+
       const gMap = {};
       (gradeRows || []).forEach((g) => { gMap[g.student_id] = g; });
       setGrades(gMap);
+
+      const sMap = {};
+      (subRows || []).forEach((s) => { sMap[s.student_id] = s; });
+      setSubmissions(sMap);
     }
     load();
     return () => { cancelled = true; };
@@ -391,6 +405,7 @@ function StaffGradesView({ profileId, isAdmin }) {
                       <tr>
                         <th>Student</th>
                         <th>Email</th>
+                        <th>Submission</th>
                         <th>Score</th>
                         <th>Out of</th>
                         <th>Feedback</th>
@@ -404,6 +419,23 @@ function StaffGradesView({ profileId, isAdmin }) {
                           <tr key={s.studentId}>
                             <td className="col-name">{s.fullName}</td>
                             <td className="text-muted">{s.email}</td>
+                            <td>
+                              {submissions[s.studentId] ? (
+                                <button
+                                  className="chip chip-green"
+                                  style={{ cursor: "pointer", border: "none", background: "none", padding: 0 }}
+                                  onClick={() => setViewingSub({
+                                    fullName:    s.fullName,
+                                    content:     submissions[s.studentId].content,
+                                    submittedAt: submissions[s.studentId].submitted_at,
+                                  })}
+                                >
+                                  Submitted ↗
+                                </button>
+                              ) : (
+                                <span className="text-muted" style={{ fontSize: 13 }}>No submission</span>
+                              )}
+                            </td>
                             <td style={{ width: 100 }}>
                               <input
                                 type="number"
@@ -452,6 +484,32 @@ function StaffGradesView({ profileId, isAdmin }) {
           </>
         )}
       </div>
+
+      {viewingSub && (
+        <div className="modal-overlay" onClick={() => setViewingSub(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2 className="modal__title">{viewingSub.fullName}&apos;s Submission</h2>
+            <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>
+              Submitted {formatDate(viewingSub.submittedAt)}
+            </p>
+            <div style={{
+              background: "var(--surface-raised, #f5f5f5)",
+              borderRadius: 6,
+              padding: "12px 16px",
+              whiteSpace: "pre-wrap",
+              fontSize: 14,
+              lineHeight: 1.6,
+              maxHeight: 400,
+              overflowY: "auto",
+            }}>
+              {viewingSub.content || <em style={{ color: "var(--text-muted)" }}>No content</em>}
+            </div>
+            <div className="modal-actions">
+              <BtnGhost onClick={() => setViewingSub(null)}>Close</BtnGhost>
+            </div>
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }

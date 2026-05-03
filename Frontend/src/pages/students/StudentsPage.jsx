@@ -163,6 +163,9 @@ export default function StudentsPage() {
   const [submitError, setSubmitError] = useState("");
   const [tempPassword,setTempPassword]= useState("");
 
+  const [studentSearch, setStudentSearch] = useState("");
+  const [staffSearch,   setStaffSearch]   = useState("");
+
   const [actionTarget,setActionTarget]= useState(null);
   const [actioning,   setActioning]   = useState(false);
   const [actionResult,setActionResult]= useState(null);   // { summary, errors } | null
@@ -229,13 +232,20 @@ export default function StudentsPage() {
     removed:  students.filter((s) => s.is_removed).length,
   };
 
-  const filteredStudents = filter === "removed"
+  const filteredStudentsBase = filter === "removed"
     ? students.filter((s) => s.is_removed)
     : filter === "all"
       ? activeStudents
       : filter === "none"
         ? activeStudents.filter((s) => !getApp(s))
         : activeStudents.filter((s) => getApp(s)?.status === filter);
+  const filteredStudents = studentSearch.trim()
+    ? filteredStudentsBase.filter((s) => {
+        const q = studentSearch.trim().toLowerCase();
+        return (s.full_name || "").toLowerCase().includes(q) ||
+               (s.email || "").toLowerCase().includes(q);
+      })
+    : filteredStudentsBase;
 
   // ── Staff derived data ────────────────────────────────────────────────────
 
@@ -248,11 +258,18 @@ export default function StudentsPage() {
     removed:   staff.filter((s) => s.is_removed).length,
   };
 
-  const filteredStaff = staffFilter === "removed"
+  const filteredStaffBase = staffFilter === "removed"
     ? staff.filter((s) => s.is_removed)
     : staffFilter === "all"
       ? activeStaff
       : activeStaff.filter((s) => s.role === staffFilter);
+  const filteredStaff = staffSearch.trim()
+    ? filteredStaffBase.filter((s) => {
+        const q = staffSearch.trim().toLowerCase();
+        return (s.full_name || "").toLowerCase().includes(q) ||
+               (s.email || "").toLowerCase().includes(q);
+      })
+    : filteredStaffBase;
 
   // ── Student form handlers ─────────────────────────────────────────────────
 
@@ -427,6 +444,30 @@ export default function StudentsPage() {
       if (next) {
         const { error } = await supabase.from("profiles").update({ role: next }).eq("id", person.id);
         if (error) { setStaffActionError(error.message); setStaffActioning(false); return; }
+
+        // TA→professor: remove TA course assignments so they can be re-assigned as professor
+        if (person.role === "ta") {
+          const { data: staffRec } = await supabase
+            .from("staff").select("id").eq("profile_id", person.id).maybeSingle();
+          if (staffRec?.id) {
+            const { data: deleted, error: csErr } = await supabase
+              .from("course_staff").delete().eq("staff_id", staffRec.id).select("id");
+            if (csErr) {
+              setStaffActionError(`Promoted, but course de-assignment failed: ${csErr.message}`);
+              setStaffActioning(false);
+              loadStaff();
+              return;
+            }
+            setStaffActionResult({
+              summary: { courseAssignments: deleted?.length || 0, reservations: 0 },
+              errors: [],
+              kind: "promote",
+            });
+            setStaffActioning(false);
+            loadStaff();
+            return;
+          }
+        }
       }
     }
 
@@ -478,7 +519,15 @@ export default function StudentsPage() {
                   <BtnPrimary onClick={openAddStudent}>+ Add Student</BtnPrimary>
                 </div>
 
-                <div className="course-tabs" style={{ marginTop: 14 }}>
+                <input
+                  className="search-input"
+                  placeholder="Search by name or email…"
+                  value={studentSearch}
+                  onChange={(e) => setStudentSearch(e.target.value)}
+                  style={{ marginTop: 14, width: "100%", maxWidth: 320 }}
+                />
+
+                <div className="course-tabs" style={{ marginTop: 10 }}>
                   {STATUS_FILTERS.map((f) => (
                     <button
                       key={f.value}
@@ -584,7 +633,15 @@ export default function StudentsPage() {
                   <BtnPrimary onClick={openAddStaff}>+ Add Staff</BtnPrimary>
                 </div>
 
-                <div className="course-tabs" style={{ marginTop: 14 }}>
+                <input
+                  className="search-input"
+                  placeholder="Search by name or email…"
+                  value={staffSearch}
+                  onChange={(e) => setStaffSearch(e.target.value)}
+                  style={{ marginTop: 14, width: "100%", maxWidth: 320 }}
+                />
+
+                <div className="course-tabs" style={{ marginTop: 10 }}>
                   {STAFF_FILTERS.map((f) => (
                     <button
                       key={f.value}
@@ -860,14 +917,25 @@ export default function StudentsPage() {
           <div className="modal modal--sm" onClick={(e) => e.stopPropagation()}>
             {staffActionResult ? (
               <>
-                <h2 className="modal__title">Staff Member Removed</h2>
+                <h2 className="modal__title">
+                  {staffActionResult.kind === "promote" ? "Promotion Complete" : "Staff Member Removed"}
+                </h2>
                 <p className="modal__body">
-                  <strong>{staffActionTarget.person.full_name}</strong> has been removed.
+                  <strong>{staffActionTarget.person.full_name}</strong>{" "}
+                  {staffActionResult.kind === "promote"
+                    ? `has been promoted to ${roleLabel(nextPromotionRole(staffActionTarget.person.role))}.`
+                    : "has been removed."}
                 </p>
                 <ul style={{ margin: "8px 0 12px 18px", fontSize: 14, color: "var(--text)" }}>
-                  <li>Account access revoked</li>
-                  <li>Un-assigned from {staffActionResult.summary.courseAssignments} course{staffActionResult.summary.courseAssignments === 1 ? "" : "s"}</li>
-                  <li>{staffActionResult.summary.reservations} room reservation{staffActionResult.summary.reservations === 1 ? "" : "s"} cancelled</li>
+                  {staffActionResult.kind === "promote" ? (
+                    <li>Removed from {staffActionResult.summary.courseAssignments} TA course assignment{staffActionResult.summary.courseAssignments === 1 ? "" : "s"} — re-assign as professor where needed</li>
+                  ) : (
+                    <>
+                      <li>Account access revoked</li>
+                      <li>Un-assigned from {staffActionResult.summary.courseAssignments} course{staffActionResult.summary.courseAssignments === 1 ? "" : "s"}</li>
+                      <li>{staffActionResult.summary.reservations} room reservation{staffActionResult.summary.reservations === 1 ? "" : "s"} cancelled</li>
+                    </>
+                  )}
                 </ul>
                 {staffActionResult.errors.length > 0 && (
                   <p className="error-msg" style={{ fontSize: 13 }}>

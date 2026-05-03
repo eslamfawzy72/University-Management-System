@@ -179,6 +179,15 @@ export default function FacilitiesPage() {
   const [cancelId,   setCancelId]   = useState(null);
   const [cancelling, setCancelling] = useState(false);
 
+  // ── room search ──
+  const [roomSearch, setRoomSearch] = useState("");
+
+  // ── maintenance requests (admin) ──
+  const [maintRequests, setMaintRequests] = useState([]);
+  const [maintLoading,  setMaintLoading]  = useState(false);
+  const [maintError,    setMaintError]    = useState(null);
+  const [markingDoneId, setMarkingDoneId] = useState(null);
+
   // ── add room modal (admin only) ──
   const [addRoomOpen,    setAddRoomOpen]    = useState(false);
   const [addRoomForm,    setAddRoomForm]    = useState(EMPTY_ROOM);
@@ -226,10 +235,24 @@ export default function FacilitiesPage() {
     setAllResLoading(false);
   }, [isAdmin]);
 
+  const loadMaintRequests = useCallback(async () => {
+    if (!isAdmin) return;
+    setMaintLoading(true);
+    setMaintError(null);
+    const { data, error } = await supabase
+      .from("maintenance_requests")
+      .select("*, rooms(name, building), submitter:profiles!submitted_by(full_name, email)")
+      .order("created_at", { ascending: false });
+    if (error) setMaintError(error.message);
+    else setMaintRequests(data || []);
+    setMaintLoading(false);
+  }, [isAdmin]);
+
   useEffect(() => {
-    if (tab === "mine") loadMyRes();
-    if (tab === "all")  loadAllRes();
-  }, [tab, loadMyRes, loadAllRes]);
+    if (tab === "mine")        loadMyRes();
+    if (tab === "all")         loadAllRes();
+    if (tab === "maintenance") loadMaintRequests();
+  }, [tab, loadMyRes, loadAllRes, loadMaintRequests]);
 
   // ─── Availability check ─────────────────────────────────────────────────────
 
@@ -268,10 +291,17 @@ export default function FacilitiesPage() {
 
   // ─── Derived room list ──────────────────────────────────────────────────────
 
-  const visibleRooms  = rooms.filter((r) => filterType === "all" || r.type === filterType);
-  const displayedRooms = bookedIds !== null
+  const visibleRooms   = rooms.filter((r) => filterType === "all" || r.type === filterType);
+  const availableRooms = bookedIds !== null
     ? visibleRooms.filter((r) => !bookedIds.has(r.id))
     : visibleRooms;
+  const displayedRooms = roomSearch.trim()
+    ? availableRooms.filter((r) => {
+        const q = roomSearch.trim().toLowerCase();
+        return (r.name || "").toLowerCase().includes(q) ||
+               (r.building || "").toLowerCase().includes(q);
+      })
+    : availableRooms;
 
   // ─── Booking modal ──────────────────────────────────────────────────────────
 
@@ -505,6 +535,18 @@ export default function FacilitiesPage() {
     if (bookedIds !== null) checkAvailability();
   }
 
+  // ─── Maintenance ────────────────────────────────────────────────────────────
+
+  async function handleMarkDone(id) {
+    setMarkingDoneId(id);
+    await supabase
+      .from("maintenance_requests")
+      .update({ status: "done", resolved_at: new Date().toISOString() })
+      .eq("id", id);
+    setMarkingDoneId(null);
+    loadMaintRequests();
+  }
+
   // ─── Add room ───────────────────────────────────────────────────────────────
 
   function openAddRoom() {
@@ -642,7 +684,8 @@ export default function FacilitiesPage() {
   const TABS = [
     { id: "rooms", label: "Available Rooms" },
     { id: "mine",  label: "My Reservations" },
-    ...(isAdmin ? [{ id: "all", label: "All Reservations" }] : []),
+    ...(isAdmin ? [{ id: "all",         label: "All Reservations" }] : []),
+    ...(isAdmin ? [{ id: "maintenance", label: "Maintenance" }]     : []),
   ];
 
   return (
@@ -713,9 +756,18 @@ export default function FacilitiesPage() {
                     </span>
                   )}
                 </h2>
-                {isAdmin && (
-                  <BtnPrimary onClick={openAddRoom}>+ Add Room</BtnPrimary>
-                )}
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <input
+                    className="search-input"
+                    placeholder="Search by name or building…"
+                    value={roomSearch}
+                    onChange={(e) => setRoomSearch(e.target.value)}
+                    style={{ width: 220 }}
+                  />
+                  {isAdmin && (
+                    <BtnPrimary onClick={openAddRoom}>+ Add Room</BtnPrimary>
+                  )}
+                </div>
               </div>
 
               {roomsLoading && <p className="text-muted">Loading rooms…</p>}
@@ -784,6 +836,68 @@ export default function FacilitiesPage() {
             {allResError   && <p className="error-msg">{allResError}</p>}
             {!allResLoading && !allResError && (
               <ReservationsTable rows={allRes} showReserver={true} />
+            )}
+          </div>
+        )}
+
+        {/* ══ MAINTENANCE REQUESTS (admin) ══ */}
+        {tab === "maintenance" && isAdmin && (
+          <div className="content-card">
+            <h2>Maintenance Requests</h2>
+            {maintLoading && <p className="text-muted">Loading…</p>}
+            {maintError   && <p className="error-msg">{maintError}</p>}
+            {!maintLoading && !maintError && (
+              maintRequests.length === 0 ? (
+                <p className="empty-state">No maintenance requests yet.</p>
+              ) : (
+                <div className="table-wrap">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Room</th>
+                        <th>Submitted by</th>
+                        <th>Description</th>
+                        <th>Status</th>
+                        <th>Submitted</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {maintRequests.map((req) => (
+                        <tr key={req.id}>
+                          <td className="col-name">
+                            {req.rooms?.name ?? "—"}
+                            {req.rooms?.building ? <span className="text-muted"> · {req.rooms.building}</span> : null}
+                          </td>
+                          <td>{req.submitter?.full_name ?? "—"}</td>
+                          <td style={{ maxWidth: 300 }}>{req.description}</td>
+                          <td>
+                            <span className={req.status === "done" ? "chip chip-green" : "chip chip-gold"}>
+                              {req.status === "done" ? "Done" : "Open"}
+                            </span>
+                          </td>
+                          <td>{fmtDate(req.created_at)}</td>
+                          <td className="actions-cell">
+                            {req.status === "open" ? (
+                              <BtnPrimary
+                                className="btn-xs"
+                                disabled={markingDoneId === req.id}
+                                onClick={() => handleMarkDone(req.id)}
+                              >
+                                {markingDoneId === req.id ? "Saving…" : "Mark Done"}
+                              </BtnPrimary>
+                            ) : (
+                              <span className="text-muted" style={{ fontSize: 12 }}>
+                                Resolved {fmtDate(req.resolved_at)}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
             )}
           </div>
         )}

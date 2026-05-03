@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 
 import AppShell from "../../components/layout/AppShell";
-import { BtnPrimary } from "../../components/ui/Buttons";
+import { BtnPrimary, BtnGhost } from "../../components/ui/Buttons";
 import { useAuth } from "../../hooks/useAuth";
 import { useEnrollment } from "../../hooks/useEnrollment";
 import { roleChipClass, roleLabel } from "../../lib/roles";
@@ -273,10 +273,115 @@ function UnregisteredStudentDashboard() {
                 View university announcements →
               </Link>
             </li>
+            <MaintenanceReportButton submitterId={profile?.id} />
           </ul>
         </article>
       </section>
     </AppShell>
+  );
+}
+
+function MaintenanceReportButton({ submitterId }) {
+  const [open,        setOpen]        = useState(false);
+  const [rooms,       setRooms]       = useState([]);
+  const [roomId,      setRoomId]      = useState("");
+  const [description, setDescription] = useState("");
+  const [submitting,  setSubmitting]  = useState(false);
+  const [error,       setError]       = useState("");
+  const [success,     setSuccess]     = useState(false);
+
+  function openModal() {
+    setOpen(true);
+    setSuccess(false);
+    setError("");
+    setDescription("");
+    if (rooms.length === 0) {
+      supabase.from("rooms").select("id, name, building").order("name")
+        .then(({ data }) => {
+          const list = data || [];
+          setRooms(list);
+          if (list.length > 0) setRoomId(list[0].id);
+        });
+    }
+  }
+
+  async function handleSubmit() {
+    if (!description.trim()) { setError("Please describe the issue."); return; }
+    if (!roomId)              { setError("Please select a room.");      return; }
+    setSubmitting(true);
+    setError("");
+    const { error: err } = await supabase.from("maintenance_requests").insert({
+      room_id:      roomId,
+      submitted_by: submitterId,
+      description:  description.trim(),
+      status:       "open",
+    });
+    setSubmitting(false);
+    if (err) { setError(err.message); return; }
+    setSuccess(true);
+  }
+
+  return (
+    <>
+      <li>
+        <button
+          className="text-link"
+          style={{ background: "none", border: "none", cursor: "pointer", padding: 0, font: "inherit", color: "inherit" }}
+          onClick={openModal}
+        >
+          Report a maintenance issue →
+        </button>
+      </li>
+
+      {open && (
+        <div className="modal-overlay" onClick={() => { if (!submitting) setOpen(false); }}>
+          <div className="modal modal--sm" onClick={(e) => e.stopPropagation()}>
+            {success ? (
+              <>
+                <h2 className="modal__title">Request Submitted</h2>
+                <p className="modal__body">Your maintenance request has been logged. The admin will review it shortly.</p>
+                <div className="modal-actions">
+                  <BtnPrimary onClick={() => setOpen(false)}>Done</BtnPrimary>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 className="modal__title">Report Maintenance Issue</h2>
+                {error && <p className="error-msg">{error}</p>}
+                <div className="auth-form">
+                  <div className="field">
+                    <span>Room <span className="text-danger">*</span></span>
+                    <select value={roomId} onChange={(e) => setRoomId(e.target.value)}>
+                      {rooms.length === 0 && <option value="">Loading rooms…</option>}
+                      {rooms.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.name}{r.building ? ` — ${r.building}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <span>Description <span className="text-danger">*</span></span>
+                    <textarea
+                      rows={3}
+                      placeholder="Describe the issue (e.g. projector not working, AC broken…)"
+                      value={description}
+                      onChange={(e) => { setDescription(e.target.value); setError(""); }}
+                    />
+                  </div>
+                </div>
+                <div className="modal-actions">
+                  <BtnGhost onClick={() => setOpen(false)}>Cancel</BtnGhost>
+                  <BtnPrimary disabled={submitting} onClick={handleSubmit}>
+                    {submitting ? "Submitting…" : "Submit Request"}
+                  </BtnPrimary>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -365,6 +470,7 @@ export default function DashboardPage({ variant }) {
                 View university announcements
               </Link>
             </li>
+            <MaintenanceReportButton submitterId={profile?.id} />
           </ul>
         </article>
       </section>
