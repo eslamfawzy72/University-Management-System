@@ -278,9 +278,29 @@ export default function CoursesPage() {
       .eq("course_id", courseId);
     if (delErr) return delErr;
 
+    // Resolve virtual admin IDs (v_<profileId>) to real staff row IDs,
+    // creating the staff row if it doesn't exist yet.
+    let professorStaffId = form.professor_staff_id;
+    if (professorStaffId?.startsWith("v_")) {
+      const profileId = professorStaffId.slice(2);
+      const { data: existing } = await supabase
+        .from("staff").select("id").eq("profile_id", profileId).maybeSingle();
+      if (existing) {
+        professorStaffId = existing.id;
+      } else {
+        const { data: created, error: createErr } = await supabase
+          .from("staff")
+          .insert({ profile_id: profileId, title: "Admin" })
+          .select("id")
+          .single();
+        if (createErr) return createErr;
+        professorStaffId = created.id;
+      }
+    }
+
     const rows = [];
-    if (form.professor_staff_id) {
-      rows.push({ course_id: courseId, staff_id: form.professor_staff_id, role: "professor" });
+    if (professorStaffId) {
+      rows.push({ course_id: courseId, staff_id: professorStaffId, role: "professor" });
     }
     for (const taId of form.ta_staff_ids) {
       rows.push({ course_id: courseId, staff_id: taId, role: "ta" });
