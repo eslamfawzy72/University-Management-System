@@ -78,6 +78,25 @@ function statusChipClass(status) {
 
 // ─── Form helpers ─────────────────────────────────────────────────────────────
 
+const EMPTY_ROOM = {
+  name:     "",
+  type:     "classroom",
+  capacity: "",
+  building: "",
+  location: "",
+};
+
+function validateRoomForm(f) {
+  const errs = {};
+  if (!f.name?.trim())                          errs.name     = "Room name is required.";
+  if (!f.type)                                  errs.type     = "Type is required.";
+  if (!f.capacity && f.capacity !== 0)          errs.capacity = "Capacity is required.";
+  else if (isNaN(Number(f.capacity)) || Number(f.capacity) < 1)
+                                                errs.capacity = "Capacity must be a positive number.";
+  if (!f.location?.trim())                      errs.location = "Location is required.";
+  return errs;
+}
+
 const EMPTY_BOOK = {
   label:       "",
   recurrence:  "one_time",   // "one_time" | "weekly"
@@ -159,6 +178,14 @@ export default function FacilitiesPage() {
   // ── cancel confirm ──
   const [cancelId,   setCancelId]   = useState(null);
   const [cancelling, setCancelling] = useState(false);
+
+  // ── add room modal (admin only) ──
+  const [addRoomOpen,    setAddRoomOpen]    = useState(false);
+  const [addRoomForm,    setAddRoomForm]    = useState(EMPTY_ROOM);
+  const [addRoomErrors,  setAddRoomErrors]  = useState({});
+  const [addRoomSaving,  setAddRoomSaving]  = useState(false);
+  const [addRoomError,   setAddRoomError]   = useState("");
+  const [addRoomSuccess, setAddRoomSuccess] = useState("");
 
   // ─── Data loading ───────────────────────────────────────────────────────────
 
@@ -478,6 +505,52 @@ export default function FacilitiesPage() {
     if (bookedIds !== null) checkAvailability();
   }
 
+  // ─── Add room ───────────────────────────────────────────────────────────────
+
+  function openAddRoom() {
+    setAddRoomForm(EMPTY_ROOM);
+    setAddRoomErrors({});
+    setAddRoomError("");
+    setAddRoomSuccess("");
+    setAddRoomOpen(true);
+  }
+
+  function rField(key, val) {
+    setAddRoomForm((f) => ({ ...f, [key]: val }));
+    setAddRoomErrors((prev) => ({ ...prev, [key]: undefined }));
+  }
+
+  async function handleAddRoom() {
+    const errs = validateRoomForm(addRoomForm);
+    if (Object.keys(errs).length) { setAddRoomErrors(errs); return; }
+
+    setAddRoomSaving(true);
+    setAddRoomError("");
+
+    const { data: existing } = await supabase
+      .from("rooms").select("id").ilike("name", addRoomForm.name.trim()).limit(1);
+    if (existing?.length) {
+      setAddRoomError("A room with this name already exists.");
+      setAddRoomSaving(false);
+      return;
+    }
+
+    const { error } = await supabase.from("rooms").insert({
+      name:     addRoomForm.name.trim(),
+      type:     addRoomForm.type,
+      capacity: Number(addRoomForm.capacity),
+      building: addRoomForm.building.trim() || null,
+      location: addRoomForm.location.trim(),
+    });
+
+    setAddRoomSaving(false);
+    if (error) { setAddRoomError(error.message); return; }
+
+    setAddRoomSuccess(`"${addRoomForm.name.trim()}" has been added successfully.`);
+    const { data } = await supabase.from("rooms").select("*").order("name");
+    setRooms(data || []);
+  }
+
   // ─── Shared reservations table ───────────────────────────────────────────────
 
   function ReservationsTable({ rows, showReserver }) {
@@ -631,14 +704,19 @@ export default function FacilitiesPage() {
             </div>
 
             <div className="content-card">
-              <h2>
-                {bookedIds !== null ? "Available Rooms" : "All Rooms"}
-                {bookedIds !== null && (
-                  <span className="admission-filter-count" style={{ marginLeft: 8 }}>
-                    {displayedRooms.length} available
-                  </span>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                <h2 style={{ margin: 0 }}>
+                  {bookedIds !== null ? "Available Rooms" : "All Rooms"}
+                  {bookedIds !== null && (
+                    <span className="admission-filter-count" style={{ marginLeft: 8 }}>
+                      {displayedRooms.length} available
+                    </span>
+                  )}
+                </h2>
+                {isAdmin && (
+                  <BtnPrimary onClick={openAddRoom}>+ Add Room</BtnPrimary>
                 )}
-              </h2>
+              </div>
 
               {roomsLoading && <p className="text-muted">Loading rooms…</p>}
 
@@ -921,6 +999,90 @@ export default function FacilitiesPage() {
                 {saving ? "Saving…" : "Save Changes"}
               </BtnPrimary>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ ADD ROOM MODAL (admin) ══ */}
+      {addRoomOpen && (
+        <div className="modal-overlay" onClick={() => { if (!addRoomSuccess) setAddRoomOpen(false); }}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            {addRoomSuccess ? (
+              <>
+                <h2 className="modal__title">Room Added</h2>
+                <p className="modal__body">{addRoomSuccess}</p>
+                <div className="modal-actions">
+                  <BtnPrimary onClick={() => { setAddRoomOpen(false); }}>Done</BtnPrimary>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 className="modal__title">Add New Room</h2>
+                {addRoomError && <p className="error-msg">{addRoomError}</p>}
+                <div className="auth-form">
+                  <div className="field">
+                    <span>Room Name <span className="text-danger">*</span></span>
+                    <input
+                      placeholder="e.g. Lab 101, Classroom A"
+                      value={addRoomForm.name}
+                      className={addRoomErrors.name ? "has-error" : ""}
+                      onChange={(e) => rField("name", e.target.value)}
+                    />
+                    {addRoomErrors.name && <small>{addRoomErrors.name}</small>}
+                  </div>
+
+                  <div className="field">
+                    <span>Type <span className="text-danger">*</span></span>
+                    <select value={addRoomForm.type}
+                      className={addRoomErrors.type ? "has-error" : ""}
+                      onChange={(e) => rField("type", e.target.value)}>
+                      <option value="classroom">Classroom</option>
+                      <option value="lab">Lab</option>
+                    </select>
+                    {addRoomErrors.type && <small>{addRoomErrors.type}</small>}
+                  </div>
+
+                  <div className="field">
+                    <span>Capacity <span className="text-danger">*</span></span>
+                    <input
+                      type="number" min="1"
+                      placeholder="e.g. 30"
+                      value={addRoomForm.capacity}
+                      className={addRoomErrors.capacity ? "has-error" : ""}
+                      onChange={(e) => rField("capacity", e.target.value)}
+                    />
+                    {addRoomErrors.capacity && <small>{addRoomErrors.capacity}</small>}
+                  </div>
+
+                  <div className="field">
+                    <span>Location <span className="text-danger">*</span></span>
+                    <input
+                      placeholder="e.g. Floor 2, Wing B"
+                      value={addRoomForm.location}
+                      className={addRoomErrors.location ? "has-error" : ""}
+                      onChange={(e) => rField("location", e.target.value)}
+                    />
+                    {addRoomErrors.location && <small>{addRoomErrors.location}</small>}
+                  </div>
+
+                  <div className="field">
+                    <span>Building</span>
+                    <input
+                      placeholder="e.g. Engineering Building"
+                      value={addRoomForm.building}
+                      onChange={(e) => rField("building", e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="modal-actions">
+                  <BtnGhost onClick={() => setAddRoomOpen(false)}>Cancel</BtnGhost>
+                  <BtnPrimary disabled={addRoomSaving} onClick={handleAddRoom}>
+                    {addRoomSaving ? "Adding…" : "Add Room"}
+                  </BtnPrimary>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
