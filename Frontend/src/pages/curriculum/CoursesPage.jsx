@@ -24,6 +24,7 @@ export default function CoursesPage() {
   const { profile } = useAuth();
   const canManage = is("admin");
   const isStudent = is("student");
+  const isStaff   = is("professor") || is("ta");
 
   const [courses, setCourses] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -48,6 +49,7 @@ export default function CoursesPage() {
   const [filterDept,             setFilterDept]             = useState("all");
   const [filterAssigned,         setFilterAssigned]         = useState(false);
   const [adminAssignedCourseIds, setAdminAssignedCourseIds] = useState(new Set());
+  const [staffAssignedCourseIds, setStaffAssignedCourseIds] = useState(new Set());
 
   const professorOptions = staffOptions.filter((s) => s.role === "professor" || s.role === "admin");
   const taOptions        = staffOptions.filter((s) => s.role === "ta");
@@ -143,6 +145,19 @@ export default function CoursesPage() {
       }
     }
 
+    // Professor / TA: load only their assigned courses
+    if (isStaff && profile?.id) {
+      const { data: myStaffRec } = await supabase
+        .from("staff").select("id").eq("profile_id", profile.id).maybeSingle();
+      if (myStaffRec?.id) {
+        const { data: myAssigned } = await supabase
+          .from("course_staff").select("course_id").eq("staff_id", myStaffRec.id);
+        setStaffAssignedCourseIds(new Set((myAssigned || []).map((r) => r.course_id)));
+      } else {
+        setStaffAssignedCourseIds(new Set());
+      }
+    }
+
     // If student, get their student record + their enrollments with status
     if (isStudent && profile?.id) {
       const { data: studentRec } = await supabase
@@ -165,7 +180,7 @@ export default function CoursesPage() {
     }
 
     setLoading(false);
-  }, [isStudent, profile?.id]);
+  }, [isStudent, isStaff, canManage, profile?.id]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -367,6 +382,7 @@ export default function CoursesPage() {
   }
 
   const filteredCourses = courses.filter((c) => {
+    if (isStaff && !staffAssignedCourseIds.has(c.id)) return false;
     if (filterType !== "all" && c.type !== filterType) return false;
     if (filterDept !== "all" && c.department_id !== filterDept) return false;
     if (filterAssigned && !adminAssignedCourseIds.has(c.id)) return false;
