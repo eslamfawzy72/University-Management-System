@@ -1621,6 +1621,89 @@ img {
   margin: 0;
 }
 
+.announcement-detail__topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.announcement-delete-btn {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--danger);
+  background: var(--danger-soft);
+  border: 1px solid rgba(231, 76, 60, 0.2);
+  border-radius: var(--radius-sm);
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.announcement-delete-btn:hover:not(:disabled) {
+  background: rgba(231, 76, 60, 0.15);
+  border-color: rgba(231, 76, 60, 0.4);
+}
+
+.announcement-delete-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.announcement-card-wrapper {
+  position: relative;
+}
+
+.announcement-card__delete {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--danger-soft);
+  border: 1px solid rgba(231, 76, 60, 0.2);
+  border-radius: 50%;
+  color: var(--danger);
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 160ms ease, background 160ms ease;
+  line-height: 1;
+}
+
+.announcement-card-wrapper:hover .announcement-card__delete {
+  opacity: 1;
+}
+
+.announcement-card__delete:hover:not(:disabled) {
+  background: rgba(231, 76, 60, 0.18);
+}
+
+.announcement-card__delete:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.announcement-card-wrapper .announcement-card {
+  width: 100%;
+}
+
+.confirm-delete-modal__body {
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.confirm-delete-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 @media (max-width: 960px) {
   .auth-layout { grid-template-columns: 1fr; }
   .auth-hero { padding: 0; }
