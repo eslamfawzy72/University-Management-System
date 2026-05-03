@@ -137,13 +137,24 @@ export default function CoursesPage() {
 
   async function handleEnroll(e, course) {
     e.stopPropagation();
-
-    const available = course.capacity != null
-      ? course.capacity - (enrolledCounts[course.id] || 0)
-      : Infinity;
-    if (available <= 0) { alert("No seats available for this course."); return; }
-
     setEnrolling(course.id);
+
+    // Live capacity check — the in-memory enrolledCounts is from page load
+    // and may be stale if other students have enrolled in the meantime.
+    if (course.capacity != null) {
+      const { count, error: countErr } = await supabase
+        .from("course_enrollments")
+        .select("id", { count: "exact", head: true })
+        .eq("course_id", course.id)
+        .eq("status", "enrolled");
+      if (countErr) { alert("Could not verify seat availability: " + countErr.message); setEnrolling(null); return; }
+      if ((count ?? 0) >= course.capacity) {
+        alert("This course is now full — the last seat was just taken. Refreshing the catalog.");
+        setEnrolling(null);
+        load();
+        return;
+      }
+    }
 
     // Auto-create student record if it doesn't exist yet
     let sid = studentId;
@@ -405,6 +416,12 @@ export default function CoursesPage() {
                   <div className="course-card__meta">
                     {c.departments?.name && (
                       <span className="course-card__meta-item">{c.departments.name}</span>
+                    )}
+                    {canManage && (
+                      <span className="chip chip-green">
+                        {enrolledCounts[c.id] || 0} enrolled
+                        {c.capacity != null ? ` / ${c.capacity}` : ""}
+                      </span>
                     )}
                     {seats != null && (
                       <span className={`course-card__seats${isFull ? " course-card__seats--full" : ""}`}>

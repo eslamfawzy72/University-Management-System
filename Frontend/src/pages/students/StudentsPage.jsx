@@ -77,6 +77,72 @@ function nextPromotionRole(role) {
 
 const EMPTY_STAFF_FORM = { fullName: "", email: "", role: "ta" };
 
+// ─── Removal cascades ─────────────────────────────────────────────────────────
+//
+// Removing a profile is a soft-delete (is_removed=true), but several dependent
+// rows must be cleaned up so the system doesn't carry stale assignments:
+//
+//   Staff removed   → un-assign from courses (course_staff), cancel their
+//                     active reservations.
+//   Student removed → drop their pending/active enrollments to free the seats.
+//                     Academic records (assignment_submissions, assignment_grades)
+//                     reference students.id directly and are preserved.
+//
+// Order matters: lock the profile FIRST so the user can't take any further
+// action mid-cascade. If a later step fails, the profile is still locked and
+// the admin can retry — repeated runs are no-ops.
+
+async function cascadeRemoveStaff(profileId) {
+  const summary = { courseAssignments: 0, reservations: 0 };
+  const errors  = [];
+
+  const { error: profileErr } = await supabase
+    .from("profiles").update({ is_removed: true }).eq("id", profileId);
+  if (profileErr) return { ok: false, summary, errors: [`Account: ${profileErr.message}`] };
+
+  const { data: staffRec } = await supabase
+    .from("staff").select("id").eq("profile_id", profileId).maybeSingle();
+
+  if (staffRec?.id) {
+    const { data: deleted, error: csErr } = await supabase
+      .from("course_staff").delete().eq("staff_id", staffRec.id).select("id");
+    if (csErr) errors.push(`Course assignments: ${csErr.message}`);
+    else summary.courseAssignments = deleted?.length || 0;
+  }
+
+  const { data: cancelled, error: resErr } = await supabase
+    .from("reservations").update({ status: "cancelled" })
+    .eq("reserved_by", profileId).neq("status", "cancelled").select("id");
+  if (resErr) errors.push(`Reservations: ${resErr.message}`);
+  else summary.reservations = cancelled?.length || 0;
+
+  return { ok: true, summary, errors };
+}
+
+async function cascadeRemoveStudent(profileId) {
+  const summary = { enrollments: 0 };
+  const errors  = [];
+
+  const { error: profileErr } = await supabase
+    .from("profiles").update({ is_removed: true }).eq("id", profileId);
+  if (profileErr) return { ok: false, summary, errors: [`Account: ${profileErr.message}`] };
+
+  const { data: studentRec } = await supabase
+    .from("students").select("id").eq("profile_id", profileId).maybeSingle();
+
+  if (studentRec?.id) {
+    const { data: deleted, error: ceErr } = await supabase
+      .from("course_enrollments").delete()
+      .eq("student_id", studentRec.id)
+      .in("status", ["pending", "enrolled"])
+      .select("id");
+    if (ceErr) errors.push(`Enrollments: ${ceErr.message}`);
+    else summary.enrollments = deleted?.length || 0;
+  }
+
+  return { ok: true, summary, errors };
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function StudentsPage() {
@@ -99,6 +165,8 @@ export default function StudentsPage() {
 
   const [actionTarget,setActionTarget]= useState(null);
   const [actioning,   setActioning]   = useState(false);
+  const [actionResult,setActionResult]= useState(null);   // { summary, errors } | null
+  const [actionError, setActionError] = useState("");
 
   // ── Staff state ────────────────────────────────────────────────────────────
   const [staff,           setStaff]           = useState([]);
@@ -115,6 +183,8 @@ export default function StudentsPage() {
 
   const [staffActionTarget,setStaffActionTarget]= useState(null);
   const [staffActioning,   setStaffActioning]   = useState(false);
+  const [staffActionResult,setStaffActionResult]= useState(null);   // { summary, errors } | null
+  const [staffActionError, setStaffActionError] = useState("");
 
   // ── Data loading ──────────────────────────────────────────────────────────
 
@@ -252,17 +322,31 @@ export default function StudentsPage() {
     const { student, action } = actionTarget;
     const app = getApp(student);
     setActioning(true);
+    setActionError("");
 
     if (action === "remove") {
-      await supabase.from("profiles").update({ is_removed: true }).eq("id", student.id);
-    } else if (action === "restore") {
-      await supabase.from("profiles").update({ is_removed: false }).eq("id", student.id);
+      const result = await cascadeRemoveStudent(student.id);
+      setActioning(false);
+      if (!result.ok) {
+        setActionError(result.errors.join("; "));
+        return;
+      }
+      setActionResult(result);
+      loadStudents();
+      return;
+    }
+
+    if (action === "restore") {
+      const { error } = await supabase.from("profiles").update({ is_removed: false }).eq("id", student.id);
+      if (error) { setActionError(error.message); setActioning(false); return; }
     } else if (action === "accept" && app) {
-      await supabase.from("admission_applications")
+      const { error } = await supabase.from("admission_applications")
         .update({ status: "approved", reviewed_by: profile.id }).eq("id", app.id);
+      if (error) { setActionError(error.message); setActioning(false); return; }
     } else if (action === "reject" && app) {
-      await supabase.from("admission_applications")
+      const { error } = await supabase.from("admission_applications")
         .update({ status: "rejected", reviewed_by: profile.id }).eq("id", app.id);
+      if (error) { setActionError(error.message); setActioning(false); return; }
     }
 
     setActioning(false); setActionTarget(null); loadStudents();
@@ -321,14 +405,29 @@ export default function StudentsPage() {
     if (!staffActionTarget) return;
     const { person, action } = staffActionTarget;
     setStaffActioning(true);
+    setStaffActionError("");
 
     if (action === "remove") {
-      await supabase.from("profiles").update({ is_removed: true }).eq("id", person.id);
-    } else if (action === "restore") {
-      await supabase.from("profiles").update({ is_removed: false }).eq("id", person.id);
+      const result = await cascadeRemoveStaff(person.id);
+      setStaffActioning(false);
+      if (!result.ok) {
+        setStaffActionError(result.errors.join("; "));
+        return;
+      }
+      setStaffActionResult(result);
+      loadStaff();
+      return;
+    }
+
+    if (action === "restore") {
+      const { error } = await supabase.from("profiles").update({ is_removed: false }).eq("id", person.id);
+      if (error) { setStaffActionError(error.message); setStaffActioning(false); return; }
     } else if (action === "promote") {
       const next = nextPromotionRole(person.role);
-      if (next) await supabase.from("profiles").update({ role: next }).eq("id", person.id);
+      if (next) {
+        const { error } = await supabase.from("profiles").update({ role: next }).eq("id", person.id);
+        if (error) { setStaffActionError(error.message); setStaffActioning(false); return; }
+      }
     }
 
     setStaffActioning(false); setStaffActionTarget(null); loadStaff();
@@ -631,36 +730,61 @@ export default function StudentsPage() {
 
       {/* ════════════════ STUDENT ACTION MODAL ════════════════ */}
       {actionTarget && (
-        <div className="modal-overlay" onClick={() => setActionTarget(null)}>
+        <div className="modal-overlay" onClick={() => { if (!actioning) { setActionTarget(null); setActionResult(null); setActionError(""); } }}>
           <div className="modal modal--sm" onClick={(e) => e.stopPropagation()}>
-            <h2 className="modal__title">
-              {actionTarget.action === "accept"  ? "Accept Application?" :
-               actionTarget.action === "reject"  ? "Reject Application?" :
-               actionTarget.action === "restore" ? "Restore Student?" :
-               "Remove Student?"}
-            </h2>
-            <p className="modal__body">
-              {actionTarget.action === "accept"
-                ? `Approve the admission for ${actionTarget.student.full_name}? They will gain full access to the system.`
-                : actionTarget.action === "reject"
-                  ? `Reject the application for ${actionTarget.student.full_name}? They will not be able to access the system.`
-                  : actionTarget.action === "restore"
-                    ? `Restore ${actionTarget.student.full_name}'s account? They will be able to log in again.`
-                    : `Remove ${actionTarget.student.full_name}? They will be unable to log in until restored.`}
-            </p>
-            <div className="modal-actions">
-              <BtnGhost onClick={() => setActionTarget(null)}>Cancel</BtnGhost>
-              <BtnPrimary
-                className={actionTarget.action === "remove" ? "btn-danger" : ""}
-                disabled={actioning}
-                onClick={handleAction}
-              >
-                {actioning ? "Processing…" :
-                  actionTarget.action === "accept"  ? "Accept" :
-                  actionTarget.action === "reject"  ? "Reject" :
-                  actionTarget.action === "restore" ? "Restore" : "Remove"}
-              </BtnPrimary>
-            </div>
+            {actionResult ? (
+              <>
+                <h2 className="modal__title">Student Removed</h2>
+                <p className="modal__body">
+                  <strong>{actionTarget.student.full_name}</strong> has been removed.
+                </p>
+                <ul style={{ margin: "8px 0 12px 18px", fontSize: 14, color: "var(--text)" }}>
+                  <li>Account access revoked</li>
+                  <li>{actionResult.summary.enrollments} pending/active enrollment{actionResult.summary.enrollments === 1 ? "" : "s"} dropped</li>
+                  <li>Submissions and grades preserved</li>
+                </ul>
+                {actionResult.errors.length > 0 && (
+                  <p className="error-msg" style={{ fontSize: 13 }}>
+                    Some cleanup failed: {actionResult.errors.join("; ")}
+                  </p>
+                )}
+                <div className="modal-actions">
+                  <BtnPrimary onClick={() => { setActionTarget(null); setActionResult(null); }}>Done</BtnPrimary>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 className="modal__title">
+                  {actionTarget.action === "accept"  ? "Accept Application?" :
+                   actionTarget.action === "reject"  ? "Reject Application?" :
+                   actionTarget.action === "restore" ? "Restore Student?" :
+                   "Remove Student?"}
+                </h2>
+                <p className="modal__body">
+                  {actionTarget.action === "accept"
+                    ? `Approve the admission for ${actionTarget.student.full_name}? They will gain full access to the system.`
+                    : actionTarget.action === "reject"
+                      ? `Reject the application for ${actionTarget.student.full_name}? They will not be able to access the system.`
+                      : actionTarget.action === "restore"
+                        ? `Restore ${actionTarget.student.full_name}'s account? They will be able to log in again. Previous enrollments are not restored.`
+                        : `Remove ${actionTarget.student.full_name}? Their account will be locked, and any pending or active course enrollments will be dropped (freeing the seats). Submissions and grades are preserved. Restoring the account does not restore enrollments.`}
+                </p>
+                {actionError && <p className="error-msg">{actionError}</p>}
+                <div className="modal-actions">
+                  <BtnGhost onClick={() => { setActionTarget(null); setActionError(""); }}>Cancel</BtnGhost>
+                  <BtnPrimary
+                    className={actionTarget.action === "remove" ? "btn-danger" : ""}
+                    disabled={actioning}
+                    onClick={handleAction}
+                  >
+                    {actioning ? "Processing…" :
+                      actionTarget.action === "accept"  ? "Accept" :
+                      actionTarget.action === "reject"  ? "Reject" :
+                      actionTarget.action === "restore" ? "Restore" : "Remove"}
+                  </BtnPrimary>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -732,33 +856,58 @@ export default function StudentsPage() {
 
       {/* ════════════════ STAFF ACTION MODAL ════════════════ */}
       {staffActionTarget && (
-        <div className="modal-overlay" onClick={() => setStaffActionTarget(null)}>
+        <div className="modal-overlay" onClick={() => { if (!staffActioning) { setStaffActionTarget(null); setStaffActionResult(null); setStaffActionError(""); } }}>
           <div className="modal modal--sm" onClick={(e) => e.stopPropagation()}>
-            <h2 className="modal__title">
-              {staffActionTarget.action === "restore" ? "Restore Staff Member?" :
-               staffActionTarget.action === "promote"
-                 ? `Promote to ${roleLabel(nextPromotionRole(staffActionTarget.person.role))}?`
-                 : "Remove Staff Member?"}
-            </h2>
-            <p className="modal__body">
-              {staffActionTarget.action === "restore"
-                ? `Restore ${staffActionTarget.person.full_name}'s account? They will be able to log in again.`
-                : staffActionTarget.action === "promote"
-                  ? `Promote ${staffActionTarget.person.full_name} from ${roleLabel(staffActionTarget.person.role)} to ${roleLabel(nextPromotionRole(staffActionTarget.person.role))}? This changes their system access level.`
-                  : `Remove ${staffActionTarget.person.full_name}? They will be unable to log in until restored.`}
-            </p>
-            <div className="modal-actions">
-              <BtnGhost onClick={() => setStaffActionTarget(null)}>Cancel</BtnGhost>
-              <BtnPrimary
-                className={staffActionTarget.action === "remove" ? "btn-danger" : ""}
-                disabled={staffActioning}
-                onClick={handleStaffAction}
-              >
-                {staffActioning ? "Processing…" :
-                  staffActionTarget.action === "restore" ? "Restore" :
-                  staffActionTarget.action === "promote" ? "Promote" : "Remove"}
-              </BtnPrimary>
-            </div>
+            {staffActionResult ? (
+              <>
+                <h2 className="modal__title">Staff Member Removed</h2>
+                <p className="modal__body">
+                  <strong>{staffActionTarget.person.full_name}</strong> has been removed.
+                </p>
+                <ul style={{ margin: "8px 0 12px 18px", fontSize: 14, color: "var(--text)" }}>
+                  <li>Account access revoked</li>
+                  <li>Un-assigned from {staffActionResult.summary.courseAssignments} course{staffActionResult.summary.courseAssignments === 1 ? "" : "s"}</li>
+                  <li>{staffActionResult.summary.reservations} room reservation{staffActionResult.summary.reservations === 1 ? "" : "s"} cancelled</li>
+                </ul>
+                {staffActionResult.errors.length > 0 && (
+                  <p className="error-msg" style={{ fontSize: 13 }}>
+                    Some cleanup failed: {staffActionResult.errors.join("; ")}
+                  </p>
+                )}
+                <div className="modal-actions">
+                  <BtnPrimary onClick={() => { setStaffActionTarget(null); setStaffActionResult(null); }}>Done</BtnPrimary>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 className="modal__title">
+                  {staffActionTarget.action === "restore" ? "Restore Staff Member?" :
+                   staffActionTarget.action === "promote"
+                     ? `Promote to ${roleLabel(nextPromotionRole(staffActionTarget.person.role))}?`
+                     : "Remove Staff Member?"}
+                </h2>
+                <p className="modal__body">
+                  {staffActionTarget.action === "restore"
+                    ? `Restore ${staffActionTarget.person.full_name}'s account? They will be able to log in again. Previous course assignments and reservations are not restored — re-assign them manually if needed.`
+                    : staffActionTarget.action === "promote"
+                      ? `Promote ${staffActionTarget.person.full_name} from ${roleLabel(staffActionTarget.person.role)} to ${roleLabel(nextPromotionRole(staffActionTarget.person.role))}? This changes their system access level.`
+                      : `Remove ${staffActionTarget.person.full_name}? Their account will be locked, they will be un-assigned from all courses, and any pending or confirmed room reservations will be cancelled. Restoring the account does not restore these.`}
+                </p>
+                {staffActionError && <p className="error-msg">{staffActionError}</p>}
+                <div className="modal-actions">
+                  <BtnGhost onClick={() => { setStaffActionTarget(null); setStaffActionError(""); }}>Cancel</BtnGhost>
+                  <BtnPrimary
+                    className={staffActionTarget.action === "remove" ? "btn-danger" : ""}
+                    disabled={staffActioning}
+                    onClick={handleStaffAction}
+                  >
+                    {staffActioning ? "Processing…" :
+                      staffActionTarget.action === "restore" ? "Restore" :
+                      staffActionTarget.action === "promote" ? "Promote" : "Remove"}
+                  </BtnPrimary>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

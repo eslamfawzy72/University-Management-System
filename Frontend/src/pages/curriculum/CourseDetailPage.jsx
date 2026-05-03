@@ -201,6 +201,25 @@ export default function CourseDetailPage() {
   }, [loadCourse, loadCourseStaff, loadStudentAccess, loadRequests, loadMaterials, loadAssignments]);
 
   async function handleApprove(enrollmentId) {
+    // Capacity guard — refuse to push enrollment past the course capacity.
+    // Re-query live so we don't rely on stale UI state. Skipped when capacity is null (unlimited).
+    if (course?.capacity != null) {
+      const { count, error: countErr } = await supabase
+        .from("course_enrollments")
+        .select("id", { count: "exact", head: true })
+        .eq("course_id", id)
+        .eq("status", "enrolled");
+      if (countErr) { alert("Could not verify capacity: " + countErr.message); return; }
+      if ((count ?? 0) >= course.capacity) {
+        alert(
+          `Cannot approve — the course is at full capacity (${count}/${course.capacity}). ` +
+          `Revoke an existing enrollment first, or increase the course capacity.`
+        );
+        loadRequests();
+        return;
+      }
+    }
+
     const { data, error: err } = await supabase
       .from("course_enrollments")
       .update({ status: "enrolled" })
