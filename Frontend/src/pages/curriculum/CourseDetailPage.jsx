@@ -486,8 +486,8 @@ export default function CourseDetailPage() {
           )}
         </div>
 
-        {/* Enrollment Requests — assigned professor or admin */}
-        {!isStudent && (
+        {/* Enrollment Requests — assigned professor or admin only; TAs are excluded */}
+        {canApproveEnrollment && (
           <div className="content-card">
             <div className="section-header">
               <h2>Enrollment Requests</h2>

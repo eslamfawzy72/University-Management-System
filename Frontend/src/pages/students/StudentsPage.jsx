@@ -75,7 +75,7 @@ function nextPromotionRole(role) {
   return null;
 }
 
-const EMPTY_STAFF_FORM = { fullName: "", email: "", role: "ta" };
+const EMPTY_STAFF_FORM = { fullName: "", email: "", role: "ta", office: "", department_id: "" };
 
 // ─── Removal cascades ─────────────────────────────────────────────────────────
 //
@@ -189,6 +189,8 @@ export default function StudentsPage() {
   const [staffActionResult,setStaffActionResult]= useState(null);   // { summary, errors } | null
   const [staffActionError, setStaffActionError] = useState("");
 
+  const [departments,      setDepartments]      = useState([]);
+
   // ── Data loading ──────────────────────────────────────────────────────────
 
   const loadStudents = useCallback(async () => {
@@ -218,7 +220,12 @@ export default function StudentsPage() {
     setStaffLoading(false);
   }, []);
 
-  useEffect(() => { loadStudents(); loadStaff(); }, [loadStudents, loadStaff]);
+  useEffect(() => {
+    loadStudents();
+    loadStaff();
+    supabase.from("departments").select("id, name").order("name")
+      .then(({ data }) => setDepartments(data || []));
+  }, [loadStudents, loadStaff]);
 
   // ── Student derived data ──────────────────────────────────────────────────
 
@@ -414,7 +421,10 @@ export default function StudentsPage() {
     if (profileErr) { setStaffSubmitError(profileErr.message); setStaffSubmitting(false); return; }
 
     // Create the staff row so the person appears in course assignment dropdowns.
-    const { error: staffRowErr } = await supabase.from("staff").insert({ profile_id: newUserId });
+    const staffPayload = { profile_id: newUserId };
+    if (staffForm.office.trim())      staffPayload.office        = staffForm.office.trim();
+    if (staffForm.department_id)      staffPayload.department_id = staffForm.department_id;
+    const { error: staffRowErr } = await supabase.from("staff").insert(staffPayload);
     if (staffRowErr) {
       setStaffSubmitError(`Account created but staff record failed: ${staffRowErr.message}`);
       setStaffSubmitting(false);
@@ -919,6 +929,23 @@ export default function StudentsPage() {
                         <option key={o.value} value={o.value}>{o.label}</option>
                       ))}
                     </select>
+                  </div>
+                  <div className="field">
+                    <span>Department</span>
+                    <select value={staffForm.department_id} onChange={(e) => sField("department_id", e.target.value)}>
+                      <option value="">— None —</option>
+                      {departments.map((d) => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <span>Office</span>
+                    <input
+                      placeholder="e.g. Room 204, Building B"
+                      value={staffForm.office}
+                      onChange={(e) => sField("office", e.target.value)}
+                    />
                   </div>
                 </div>
                 <div className="modal-actions">
