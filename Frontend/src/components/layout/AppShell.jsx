@@ -98,6 +98,15 @@ export default function AppShell({ title, subtitle, children }) {
               </>
             )}
 
+            {(role === "student" || role === "professor" || role === "ta" || role === "admin") && (
+              <>
+                <p className="sidebar-label">Directory</p>
+                <NavLink className="sidebar-nav__link" to="/staff/directory">
+                  Staff Directory
+                </NavLink>
+              </>
+            )}
+
             {role === "admin" && (
               <>
                 <p className="sidebar-label">People</p>
