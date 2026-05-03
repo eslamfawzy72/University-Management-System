@@ -69,10 +69,21 @@ export default function AppShell({ title, subtitle, children }) {
 
           <div className="sidebar-card">
             <span className={`chip ${roleChipClass(role)}`}>{roleLabel(role)}</span>
+                            {(role === "professor" || role === "ta" || role === "admin") && ( 
+                        <NavLink  to="/staff/profile">
+            <h2>{profile?.full_name || "Welcome"}</h2>
+            <p>{profile?.email || "Signed in session"}</p>
+              </NavLink>
+                            )}
+          </div>
+
+                            {(role === "student" || role === "parent") && ( <>
+<span className={`chip ${roleChipClass(role)}`}></span>
+           <div className="sidebar-card">
             <h2>{profile?.full_name || "Welcome"}</h2>
             <p>{profile?.email || "Signed in session"}</p>
           </div>
-
+          </>)}
           <nav className="sidebar-nav">
             <NavLink className="sidebar-nav__link" to={homePath} end>
               Dashboard
@@ -94,6 +105,15 @@ export default function AppShell({ title, subtitle, children }) {
                 <p className="sidebar-label">Facilities</p>
                 <NavLink className="sidebar-nav__link" to="/facilities">
                   Rooms &amp; Reservations
+                </NavLink>
+              </>
+            )}
+
+            {(role === "student" || role === "professor" || role === "ta" || role === "admin") && (
+              <>
+                <p className="sidebar-label">Directory</p>
+                <NavLink className="sidebar-nav__link" to="/staff/directory">
+                  Staff Directory
                 </NavLink>
               </>
             )}

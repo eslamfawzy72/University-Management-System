@@ -18,6 +18,8 @@ import MessagesPage from "./pages/messages/MessagesPage";
 import AdmissionsPage from "./pages/admissions/AdmissionsPage";
 import FacilitiesPage from "./pages/facilities/FacilitiesPage";
 import StudentsPage from "./pages/students/StudentsPage";
+import StaffDirectoryPage from "./pages/staff/StaffDirectoryPage";
+import StaffProfilePage from "./pages/staff/StaffProfilePage";
 import CompleteProfilePage from "./pages/auth/CompleteProfilePage";
 
 function FullscreenState({ title, message }) {
@@ -260,6 +262,26 @@ function App() {
           <RequireSession>
             <RoleGuard allowedRoles={["admin"]}>
               <StudentsPage />
+            </RoleGuard>
+          </RequireSession>
+        }
+      />
+      <Route
+        path="/staff/profile"
+        element={
+          <RequireSession>
+            <RoleGuard allowedRoles={["professor", "ta", "admin"]}>
+              <StaffProfilePage />
+            </RoleGuard>
+          </RequireSession>
+        }
+      />
+      <Route
+        path="/staff/directory"
+        element={
+          <RequireSession>
+            <RoleGuard allowedRoles={["student", "professor", "ta", "admin"]}>
+              <StaffDirectoryPage />
             </RoleGuard>
           </RequireSession>
         }
