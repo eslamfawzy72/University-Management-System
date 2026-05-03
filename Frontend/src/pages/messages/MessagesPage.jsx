@@ -391,7 +391,7 @@ export default function MessagesPage() {
   const { role } = useRole();
   const authUserId = session?.user?.id;
 
-  const isStaff = role === "professor" || role === "ta" || role === "admin";
+  const isStaff = role === "professor" || role === "ta" || role === "admin" || role === "parent";
 
   const studentData = useStudentContacts(isStaff ? null : profile);
   const staffData = useStaffContacts(isStaff ? authUserId : null);

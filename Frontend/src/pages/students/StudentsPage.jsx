@@ -143,6 +143,14 @@ async function cascadeRemoveStudent(profileId) {
   return { ok: true, summary, errors };
 }
 
+// ─── Parent-link helpers ──────────────────────────────────────────────────────
+
+const PARENT_FILTERS = [
+  { value: "all",    label: "All" },
+  { value: "linked",   label: "Linked" },
+  { value: "unlinked", label: "Unlinked" },
+];
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function StudentsPage() {
@@ -191,6 +199,24 @@ export default function StudentsPage() {
 
   const [departments,      setDepartments]      = useState([]);
 
+  // ── Parents state ──────────────────────────────────────────────────────────
+  const [parents,          setParents]          = useState([]);
+  const [parentsLoading,   setParentsLoading]   = useState(true);
+  const [parentsError,     setParentsError]     = useState(null);
+  const [parentFilter,     setParentFilter]     = useState("all");
+  const [parentSearch,     setParentSearch]     = useState("");
+  // studentRows: [{id: students.id, full_name, student_number}] — used in link dropdown
+  const [studentRows,      setStudentRows]      = useState([]);
+
+  const [linkTarget,       setLinkTarget]       = useState(null); // parent profile being acted on
+  const [linkStudentId,    setLinkStudentId]    = useState("");
+  const [linking,          setLinking]          = useState(false);
+  const [linkError,        setLinkError]        = useState("");
+
+  const [unlinkTarget,     setUnlinkTarget]     = useState(null);
+  const [unlinking,        setUnlinking]        = useState(false);
+  const [unlinkError,      setUnlinkError]      = useState("");
+
   // ── Data loading ──────────────────────────────────────────────────────────
 
   const loadStudents = useCallback(async () => {
@@ -220,12 +246,50 @@ export default function StudentsPage() {
     setStaffLoading(false);
   }, []);
 
+  const loadParents = useCallback(async () => {
+    setParentsLoading(true); setParentsError(null);
+    const { data, error: err } = await supabase
+      .from("profiles")
+      .select("id, full_name, email")
+      .eq("role", "parent")
+      .order("full_name");
+    if (err) { setParentsError(err.message); setParentsLoading(false); return; }
+
+    const parentIds = (data || []).map((p) => p.id);
+    let linkMap = {};
+    if (parentIds.length > 0) {
+      const { data: links } = await supabase
+        .from("parents")
+        .select("profile_id, student_id, students(id, student_number, profiles(full_name))")
+        .in("profile_id", parentIds);
+      for (const l of links || []) {
+        linkMap[l.profile_id] = l;
+      }
+    }
+
+    setParents((data || []).map((p) => ({ ...p, link: linkMap[p.id] ?? null })));
+    setParentsLoading(false);
+  }, []);
+
   useEffect(() => {
     loadStudents();
     loadStaff();
+    loadParents();
     supabase.from("departments").select("id, name").order("name")
       .then(({ data }) => setDepartments(data || []));
-  }, [loadStudents, loadStaff]);
+    // Load students table rows (id = students.id) for the link dropdown
+    supabase
+      .from("students")
+      .select("id, student_number, profiles(full_name)")
+      .order("id")
+      .then(({ data }) => setStudentRows(
+        (data || []).map((r) => ({
+          id: r.id,
+          full_name: r.profiles?.full_name ?? "",
+          student_number: r.student_number,
+        }))
+      ));
+  }, [loadStudents, loadStaff, loadParents]);
 
   // ── Student derived data ──────────────────────────────────────────────────
 
@@ -277,6 +341,66 @@ export default function StudentsPage() {
                (s.email || "").toLowerCase().includes(q);
       })
     : filteredStaffBase;
+
+  // ── Parents derived data ──────────────────────────────────────────────────
+
+  const parentCounts = {
+    all:      parents.length,
+    linked:   parents.filter((p) => p.link).length,
+    unlinked: parents.filter((p) => !p.link).length,
+  };
+
+  const filteredParentsBase =
+    parentFilter === "linked"   ? parents.filter((p) => p.link) :
+    parentFilter === "unlinked" ? parents.filter((p) => !p.link) :
+    parents;
+
+  const filteredParents = parentSearch.trim()
+    ? filteredParentsBase.filter((p) => {
+        const q = parentSearch.trim().toLowerCase();
+        return (p.full_name || "").toLowerCase().includes(q) ||
+               (p.email || "").toLowerCase().includes(q);
+      })
+    : filteredParentsBase;
+
+  // ── Link / Unlink handlers ────────────────────────────────────────────────
+
+  async function handleLink() {
+    if (!linkTarget || !linkStudentId) return;
+    setLinking(true); setLinkError("");
+
+    // Remove any existing link for this parent, then insert the new one.
+    // linkStudentId is students.id (not profiles.id).
+    await supabase.from("parents").delete().eq("profile_id", linkTarget.id);
+
+    const { error } = await supabase.from("parents").insert({
+      profile_id: linkTarget.id,
+      student_id: linkStudentId,
+    });
+
+    setLinking(false);
+    if (error) { setLinkError(error.message); return; }
+
+    setLinkTarget(null);
+    setLinkStudentId("");
+    loadParents();
+  }
+
+  async function handleUnlink() {
+    if (!unlinkTarget) return;
+    setUnlinking(true); setUnlinkError("");
+
+    const { error } = await supabase
+      .from("parents")
+      .delete()
+      .eq("profile_id", unlinkTarget.id);
+
+    setUnlinking(false);
+    if (error) { setUnlinkError(error.message); return; }
+
+    setUnlinkTarget(null);
+    loadParents();
+  }
 
   // ── Student form handlers ─────────────────────────────────────────────────
 
@@ -536,6 +660,12 @@ export default function StudentsPage() {
           >
             Staff
           </button>
+          <button
+            className={`course-tab${activeTab === "parents" ? " course-tab--active" : ""}`}
+            onClick={() => setActiveTab("parents")}
+          >
+            Parents
+          </button>
         </div>
 
         {/* ════════════════════════════ STUDENTS PANEL ═════════════════════════ */}
@@ -749,7 +879,159 @@ export default function StudentsPage() {
             )}
           </>
         )}
+
+        {/* ════════════════════════════ PARENTS PANEL ═════════════════════════ */}
+        {activeTab === "parents" && (
+          <>
+            {parentsLoading && <p className="text-muted">Loading parents…</p>}
+            {parentsError   && <p className="error-msg">{parentsError}</p>}
+
+            {!parentsLoading && !parentsError && (
+              <div className="content-card">
+                <div className="students-header">
+                  <h2>All Parents</h2>
+                </div>
+
+                <input
+                  className="search-input"
+                  placeholder="Search by name or email…"
+                  value={parentSearch}
+                  onChange={(e) => setParentSearch(e.target.value)}
+                  style={{ marginTop: 14, width: "100%", maxWidth: 320 }}
+                />
+
+                <div className="course-tabs" style={{ marginTop: 10 }}>
+                  {PARENT_FILTERS.map((f) => (
+                    <button
+                      key={f.value}
+                      className={`course-tab${parentFilter === f.value ? " course-tab--active" : ""}`}
+                      onClick={() => setParentFilter(f.value)}
+                    >
+                      {f.label}
+                      <span className="admission-filter-count">{parentCounts[f.value]}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {filteredParents.length === 0 ? (
+                  <p className="empty-state">No parents found.</p>
+                ) : (
+                  <div className="table-wrap">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Name</th>
+                          <th>Email</th>
+                          <th>Linked Student</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredParents.map((parent) => {
+                          const child = parent.link?.students;
+                          return (
+                            <tr key={parent.id}>
+                              <td className="col-name">{parent.full_name || "—"}</td>
+                              <td>{parent.email || "—"}</td>
+                              <td>
+                                {child ? (
+                                  <span>
+                                    {child.profiles?.full_name || "—"}
+                                    {child.student_number && (
+                                      <span className="text-muted" style={{ fontSize: 12, marginLeft: 6 }}>
+                                        #{child.student_number}
+                                      </span>
+                                    )}
+                                  </span>
+                                ) : (
+                                  <span className="chip chip-gray">Not linked</span>
+                                )}
+                              </td>
+                              <td className="actions-cell">
+                                <BtnPrimary
+                                  className="btn-xs"
+                                  onClick={() => {
+                                    setLinkTarget(parent);
+                                    setLinkStudentId(parent.link?.student_id ?? "");
+                                    setLinkError("");
+                                  }}
+                                >
+                                  {child ? "Change" : "Link Student"}
+                                </BtnPrimary>
+                                {child && (
+                                  <BtnGhost
+                                    className="btn-xs btn-ghost-danger"
+                                    onClick={() => { setUnlinkTarget(parent); setUnlinkError(""); }}
+                                  >
+                                    Unlink
+                                  </BtnGhost>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
       </div>
+
+      {/* ════════════════ LINK STUDENT MODAL ════════════════ */}
+      {linkTarget && (
+        <div className="modal-overlay" onClick={() => { if (!linking) setLinkTarget(null); }}>
+          <div className="modal modal--sm" onClick={(e) => e.stopPropagation()}>
+            <h2 className="modal__title">Link Student</h2>
+            <p className="modal__body">
+              Select the student to link to <strong>{linkTarget.full_name}</strong>.
+              {linkTarget.link && " This will replace the current link."}
+            </p>
+            {linkError && <p className="error-msg">{linkError}</p>}
+            <div className="field" style={{ marginTop: 12 }}>
+              <span>Student <span className="text-danger">*</span></span>
+              <select value={linkStudentId} onChange={(e) => { setLinkStudentId(e.target.value); setLinkError(""); }}>
+                <option value="">— Select a student —</option>
+                {studentRows.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.full_name || "—"}
+                    {s.student_number ? ` (#${s.student_number})` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="modal-actions">
+              <BtnGhost onClick={() => setLinkTarget(null)} disabled={linking}>Cancel</BtnGhost>
+              <BtnPrimary onClick={handleLink} disabled={linking || !linkStudentId}>
+                {linking ? "Linking…" : "Confirm Link"}
+              </BtnPrimary>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════ UNLINK CONFIRM MODAL ════════════════ */}
+      {unlinkTarget && (
+        <div className="modal-overlay" onClick={() => { if (!unlinking) setUnlinkTarget(null); }}>
+          <div className="modal modal--sm" onClick={(e) => e.stopPropagation()}>
+            <h2 className="modal__title">Unlink Student?</h2>
+            <p className="modal__body">
+              Remove the link between <strong>{unlinkTarget.full_name}</strong> and their
+              linked student? The parent account will remain active but will no longer
+              have access to the student's data.
+            </p>
+            {unlinkError && <p className="error-msg">{unlinkError}</p>}
+            <div className="modal-actions">
+              <BtnGhost onClick={() => setUnlinkTarget(null)} disabled={unlinking}>Cancel</BtnGhost>
+              <BtnPrimary className="btn-danger" onClick={handleUnlink} disabled={unlinking}>
+                {unlinking ? "Unlinking…" : "Unlink"}
+              </BtnPrimary>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ════════════════ ADD STUDENT MODAL ════════════════ */}
       {showAdd && (

@@ -53,7 +53,7 @@ export default function AppShell({ title, subtitle, children }) {
 
   const homePath = roleDashboardPath(role);
   const isUnregistered = role === "student" && enrolled === false;
-  const showInbox = !isUnregistered && (role === "student" || role === "professor" || role === "ta" || role === "admin");
+  const showInbox = !isUnregistered && (role === "student" || role === "professor" || role === "ta" || role === "admin" || role === "parent");
 
   return (
     <div className="app-shell">

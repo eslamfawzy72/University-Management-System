@@ -9,6 +9,7 @@ import AccessDenied from "./pages/AccessDenied";
 import AuthPage from "./pages/auth/AuthPage";
 import AnnouncementsPage from "./pages/announcements/AnnouncementsPage";
 import DashboardPage from "./pages/dashboard/DashboardPage";
+import ParentDashboardPage from "./pages/dashboard/ParentDashboardPage";
 import CoursesPage from "./pages/curriculum/CoursesPage";
 import CourseDetailPage from "./pages/curriculum/CourseDetailPage";
 import MaterialsPage from "./pages/curriculum/MaterialsPage";
@@ -157,7 +158,7 @@ function App() {
         element={
           <RequireSession>
             <RoleGuard allowedRoles={["parent", "admin"]}>
-              <DashboardPage variant="parent" />
+              <ParentDashboardPage />
             </RoleGuard>
           </RequireSession>
         }
@@ -238,7 +239,7 @@ function App() {
         path="/messages"
         element={
           <RequireSession>
-            <RoleGuard allowedRoles={["student", "professor", "ta", "admin"]}>
+            <RoleGuard allowedRoles={["student", "professor", "ta", "admin", "parent"]}>
               <RequireEnrolled>
                 <MessagesPage />
               </RequireEnrolled>
