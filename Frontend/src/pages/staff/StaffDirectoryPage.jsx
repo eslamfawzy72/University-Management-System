@@ -128,6 +128,7 @@ export default function StaffDirectoryPage() {
                       <th>Department</th>
                       <th>Email</th>
                       <th>Office</th>
+                      <th>Office hours</th>
                       <th></th>
                     </tr>
                   </thead>
@@ -148,6 +149,11 @@ export default function StaffDirectoryPage() {
                             : <span className="text-muted">—</span>}
                         </td>
                         <td>{p.office_location || <span className="text-muted">—</span>}</td>
+                        <td>
+                          {p.office_hours
+                            ? p.office_hours
+                            : <span className="text-muted">Not available</span>}
+                        </td>
                         <td className="actions-cell">
                           <BtnGhost className="btn-xs" onClick={() => setSelected(p)}>
                             View
@@ -190,6 +196,39 @@ export default function StaffDirectoryPage() {
               </div>
             </div>
 
+            <div
+              style={{
+                background: "var(--accent-soft)",
+                border: "1px solid var(--border)",
+                borderRadius: 10,
+                padding: "14px 16px",
+                marginBottom: 14,
+              }}
+            >
+              <span
+                style={{
+                  display: "block",
+                  fontSize: 10,
+                  fontWeight: 600,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: "var(--accent)",
+                  marginBottom: 6,
+                }}
+              >
+                Office hours
+              </span>
+              {selected.office_hours ? (
+                <strong style={{ fontSize: 15, color: "var(--text)", whiteSpace: "pre-line" }}>
+                  {selected.office_hours}
+                </strong>
+              ) : (
+                <strong style={{ fontSize: 15, color: "var(--text-muted)", fontWeight: 500 }}>
+                  Not available
+                </strong>
+              )}
+            </div>
+
             <dl className="ta-meta-grid">
               <div className="ta-meta-item">
                 <span>Title</span>
@@ -199,9 +238,9 @@ export default function StaffDirectoryPage() {
                 <span>Department</span>
                 <strong>{selected.department || "Not set"}</strong>
               </div>
-              <div className="ta-meta-item">
+              <div className="ta-meta-item" style={{ gridColumn: "span 2", minWidth: 0 }}>
                 <span>Email</span>
-                <strong>
+                <strong style={{ minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-all" }}>
                   {selected.email
                     ? <a href={`mailto:${selected.email}`} className="text-link">{selected.email}</a>
                     : "Not set"}
@@ -210,10 +249,6 @@ export default function StaffDirectoryPage() {
               <div className="ta-meta-item">
                 <span>Office location</span>
                 <strong>{selected.office_location || "Not set"}</strong>
-              </div>
-              <div className="ta-meta-item">
-                <span>Office hours</span>
-                <strong>{selected.office_hours || "Not set"}</strong>
               </div>
             </dl>
 
