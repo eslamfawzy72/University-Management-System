@@ -413,6 +413,14 @@ export default function StudentsPage() {
     }, { onConflict: "id" });
     if (profileErr) { setStaffSubmitError(profileErr.message); setStaffSubmitting(false); return; }
 
+    // Create the staff row so the person appears in course assignment dropdowns.
+    const { error: staffRowErr } = await supabase.from("staff").insert({ profile_id: newUserId });
+    if (staffRowErr) {
+      setStaffSubmitError(`Account created but staff record failed: ${staffRowErr.message}`);
+      setStaffSubmitting(false);
+      return;
+    }
+
     setStaffSubmitting(false);
     setStaffTempPwd(pwd);
     loadStaff();
@@ -445,10 +453,24 @@ export default function StudentsPage() {
         const { error } = await supabase.from("profiles").update({ role: next }).eq("id", person.id);
         if (error) { setStaffActionError(error.message); setStaffActioning(false); return; }
 
+        // Ensure a staff row exists — may be absent for accounts created before the fix.
+        const { data: existingStaffRec } = await supabase
+          .from("staff").select("id").eq("profile_id", person.id).maybeSingle();
+        if (!existingStaffRec) {
+          const { error: staffRowErr } = await supabase.from("staff").insert({ profile_id: person.id });
+          if (staffRowErr) {
+            setStaffActionError(`Promoted, but staff record creation failed: ${staffRowErr.message}`);
+            setStaffActioning(false);
+            loadStaff();
+            return;
+          }
+        }
+
         // TA→professor: remove TA course assignments so they can be re-assigned as professor
         if (person.role === "ta") {
-          const { data: staffRec } = await supabase
-            .from("staff").select("id").eq("profile_id", person.id).maybeSingle();
+          const { data: staffRec } = existingStaffRec
+            ? { data: existingStaffRec }
+            : await supabase.from("staff").select("id").eq("profile_id", person.id).maybeSingle();
           if (staffRec?.id) {
             const { data: deleted, error: csErr } = await supabase
               .from("course_staff").delete().eq("staff_id", staffRec.id).select("id");
