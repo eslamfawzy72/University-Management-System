@@ -63,6 +63,8 @@ export default function CourseDetailPage() {
   const [mySubmissions, setMySubmissions] = useState({});
   // Grades visible to current student: { [assignmentId]: { score, max_score, feedback } }
   const [myGrades, setMyGrades] = useState({});
+  // Submission counts visible to staff: { [assignmentId]: number }
+  const [submissionCounts, setSubmissionCounts] = useState({});
   // Submit modal state
   const [submitModal, setSubmitModal] = useState(null); // assignment object
   const [submitContent, setSubmitContent] = useState("");
@@ -184,6 +186,28 @@ export default function CourseDetailPage() {
     setAssignments(data || []);
   }, [id]);
 
+  const loadSubmissionCounts = useCallback(async () => {
+    if (isStudent) return;
+    const { data: courseAssignments } = await supabase
+      .from("assignments")
+      .select("id")
+      .eq("course_id", id);
+    const assignmentIds = (courseAssignments || []).map((a) => a.id);
+    if (assignmentIds.length === 0) {
+      setSubmissionCounts({});
+      return;
+    }
+    const { data: subs } = await supabase
+      .from("assignment_submissions")
+      .select("assignment_id")
+      .in("assignment_id", assignmentIds);
+    const counts = {};
+    (subs || []).forEach((s) => {
+      counts[s.assignment_id] = (counts[s.assignment_id] || 0) + 1;
+    });
+    setSubmissionCounts(counts);
+  }, [id, isStudent]);
+
   useEffect(() => {
     async function init() {
       setLoading(true);
@@ -194,11 +218,12 @@ export default function CourseDetailPage() {
         loadRequests(),
         loadMaterials(),
         loadAssignments(),
+        loadSubmissionCounts(),
       ]);
       setLoading(false);
     }
     init();
-  }, [loadCourse, loadCourseStaff, loadStudentAccess, loadRequests, loadMaterials, loadAssignments]);
+  }, [loadCourse, loadCourseStaff, loadStudentAccess, loadRequests, loadMaterials, loadAssignments, loadSubmissionCounts]);
 
   async function handleApprove(enrollmentId) {
     // Capacity guard — refuse to push enrollment past the course capacity.
@@ -662,6 +687,7 @@ export default function CourseDetailPage() {
                       <th>Status</th>
                       {isStudent && <th>My Submission</th>}
                       {isStudent && <th>Grade</th>}
+                      {!isStudent && <th>Submissions</th>}
                       {(canManage || isStudent) && <th>Actions</th>}
                     </tr>
                   </thead>
@@ -722,6 +748,29 @@ export default function CourseDetailPage() {
                               ) : (
                                 <span className="text-muted">—</span>
                               )}
+                            </td>
+                          )}
+                          {!isStudent && (
+                            <td>
+                              {(() => {
+                                const enrolledCount = enrolledRequests.length;
+                                const submittedCount = submissionCounts[a.id] || 0;
+                                if (enrolledCount === 0) {
+                                  return <span className="text-muted">No students</span>;
+                                }
+                                const allSubmitted = submittedCount >= enrolledCount;
+                                const noneSubmitted = submittedCount === 0;
+                                const chipClass = allSubmitted
+                                  ? "chip chip-green"
+                                  : noneSubmitted && closed
+                                    ? "chip chip-red"
+                                    : "chip chip-gold";
+                                return (
+                                  <span className={chipClass}>
+                                    {submittedCount} / {enrolledCount} submitted
+                                  </span>
+                                );
+                              })()}
                             </td>
                           )}
                           {(canManage || isStudent) && (
