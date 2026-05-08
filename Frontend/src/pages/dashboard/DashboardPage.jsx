@@ -9,50 +9,143 @@ import { roleChipClass, roleLabel } from "../../lib/roles";
 import { supabase } from "../../lib/supabase";
 import TaAssignedCoursesPanel from "./TaAssignedCoursesPanel";
 
-const DASHBOARD_COPY = {
-  student: {
-    title: "Student dashboard",
-    subtitle: "Track classes, submissions, and grades from one place.",
-    summary: [
-      { label: "Courses", value: "5" },
-      { label: "Pending tasks", value: "3" },
-      { label: "Average grade", value: "91%" },
-    ],
-    highlights: [
-      "Enrolled course materials are available for instant reading.",
-      "Assignment deadlines stay visible in the dashboard timeline.",
-      "Grades and feedback stay tied to your profile row in Supabase.",
-    ],
-  },
-  parent: {
-    title: "Parent dashboard",
-    subtitle: "Monitor progress and stay in contact with the teaching team.",
-    summary: [
-      { label: "Linked students", value: "1" },
-      { label: "Unread messages", value: "2" },
-      { label: "Alerts", value: "1" },
-    ],
-    highlights: [
-      "Check the latest grades for the linked student account.",
-      "Follow upcoming assignments and announcements.",
-      "Message the teaching team without leaving the portal.",
-    ],
-  },
-  staff: {
-    title: "Staff dashboard",
-    subtitle: "Manage teaching tasks, materials, and communication.",
-    summary: [
-      { label: "Active courses", value: "4" },
-      { label: "Submissions", value: "18" },
-      { label: "Announcements", value: "6" },
-    ],
-    highlights: [
-      "Publish materials and assignments to assigned courses.",
-      "Review submissions and record grades for your classes.",
-      "Coordinate with students and parents through messages.",
-    ],
-  },
+const DASHBOARD_HIGHLIGHTS = {
+  student: [
+    "Enrolled course materials are available for instant reading.",
+    "Assignment deadlines stay visible in the dashboard timeline.",
+    "Grades and feedback stay tied to your profile.",
+  ],
+  staff: [
+    "Publish materials and assignments to assigned courses.",
+    "Review submissions and record grades for your classes.",
+    "Coordinate with students and parents through messages.",
+  ],
 };
+
+function useStudentStats(profileId) {
+  const [stats, setStats] = useState(null);
+
+  useEffect(() => {
+    if (!profileId) return;
+    let cancelled = false;
+
+    async function load() {
+      const { data: studentRec } = await supabase
+        .from("students")
+        .select("id")
+        .eq("profile_id", profileId)
+        .maybeSingle();
+
+      if (!studentRec || cancelled) return;
+      const studentId = studentRec.id;
+
+      const [enrollRes, gradesRes, submissionsRes] = await Promise.all([
+        supabase
+          .from("course_enrollments")
+          .select("course_id")
+          .eq("student_id", studentId)
+          .eq("status", "enrolled"),
+        supabase
+          .from("assignment_grades")
+          .select("score, max_score")
+          .eq("student_id", studentId),
+        supabase
+          .from("assignment_submissions")
+          .select("assignment_id")
+          .eq("student_id", studentId),
+      ]);
+
+      if (cancelled) return;
+
+      const enrolledCourseIds = (enrollRes.data ?? []).map((e) => e.course_id);
+      const courseCount = enrolledCourseIds.length;
+
+      const grades = gradesRes.data ?? [];
+      const avg = grades.length
+        ? Math.round(grades.reduce((sum, g) => sum + (g.max_score ? (g.score / g.max_score) * 100 : 0), 0) / grades.length)
+        : null;
+
+      const submittedIds = new Set((submissionsRes.data ?? []).map((s) => s.assignment_id));
+
+      let pendingCount = 0;
+      if (enrolledCourseIds.length > 0) {
+        const { data: upcomingAssignments } = await supabase
+          .from("assignments")
+          .select("id")
+          .eq("is_published", true)
+          .gt("due_date", new Date().toISOString())
+          .in("course_id", enrolledCourseIds);
+        if (!cancelled) {
+          pendingCount = (upcomingAssignments ?? []).filter((a) => !submittedIds.has(a.id)).length;
+        }
+      }
+
+      if (!cancelled) {
+        setStats({
+          courses: courseCount,
+          pending: pendingCount,
+          avg: avg !== null ? `${avg}%` : "—",
+        });
+      }
+    }
+
+    load();
+    return () => { cancelled = true; };
+  }, [profileId]);
+
+  return stats;
+}
+
+function useStaffStats(profileId) {
+  const [stats, setStats] = useState(null);
+
+  useEffect(() => {
+    if (!profileId) return;
+    let cancelled = false;
+
+    async function load() {
+      const [staffRecRes, assignmentsRes, announcementsRes] = await Promise.all([
+        supabase.from("staff").select("id").eq("profile_id", profileId).maybeSingle(),
+        supabase.from("assignments").select("id").eq("created_by", profileId),
+        supabase.from("announcements").select("id", { count: "exact", head: true }).eq("author_id", profileId),
+      ]);
+
+      if (cancelled) return;
+
+      const staffRec = staffRecRes.data;
+      const assignmentIds = (assignmentsRes.data ?? []).map((a) => a.id);
+
+      const [coursesRes, submissionsRes] = await Promise.all([
+        staffRec
+          ? supabase
+              .from("course_staff")
+              .select("courses!inner(id)", { count: "exact", head: true })
+              .eq("staff_id", staffRec.id)
+              .eq("courses.is_active", true)
+          : Promise.resolve({ count: 0 }),
+        assignmentIds.length
+          ? supabase
+              .from("assignment_submissions")
+              .select("id", { count: "exact", head: true })
+              .in("assignment_id", assignmentIds)
+          : Promise.resolve({ count: 0 }),
+      ]);
+
+      if (cancelled) return;
+
+      setStats({
+        activeCourses: coursesRes.count ?? 0,
+        submissions: submissionsRes.count ?? 0,
+        announcements: announcementsRes.count ?? 0,
+      });
+    }
+
+    load();
+    return () => { cancelled = true; };
+  }, [profileId]);
+
+  return stats;
+}
 
 function appStatusChipClass(status) {
   switch (status) {
@@ -385,6 +478,44 @@ function MaintenanceReportButton({ submitterId }) {
   );
 }
 
+function StudentSummaryGrid({ profileId }) {
+  const stats = useStudentStats(profileId);
+  const items = [
+    { label: "Enrolled courses", value: stats?.courses ?? "—" },
+    { label: "Pending tasks", value: stats?.pending ?? "—" },
+    { label: "Average grade", value: stats?.avg ?? "—" },
+  ];
+  return (
+    <div className="summary-grid">
+      {items.map((item) => (
+        <article key={item.label} className="summary-card">
+          <span>{item.label}</span>
+          <strong>{item.value}</strong>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function StaffSummaryGrid({ profileId }) {
+  const stats = useStaffStats(profileId);
+  const items = [
+    { label: "Active courses", value: stats?.activeCourses ?? "—" },
+    { label: "Submissions", value: stats?.submissions ?? "—" },
+    { label: "Announcements", value: stats?.announcements ?? "—" },
+  ];
+  return (
+    <div className="summary-grid">
+      {items.map((item) => (
+        <article key={item.label} className="summary-card">
+          <span>{item.label}</span>
+          <strong>{item.value}</strong>
+        </article>
+      ))}
+    </div>
+  );
+}
+
 export default function DashboardPage({ variant }) {
   const { profile } = useAuth();
   const { enrolled } = useEnrollment();
@@ -401,13 +532,22 @@ export default function DashboardPage({ variant }) {
     if (!enrolled) return <UnregisteredStudentDashboard />;
   }
 
-  const copy = DASHBOARD_COPY[variant];
   const currentRole = profile?.role ?? variant;
   const isTaDashboard = variant === "staff" && currentRole === "ta";
-  const title = isTaDashboard ? "TA dashboard" : copy.title;
-  const subtitle = isTaDashboard
+
+  const title = variant === "student"
+    ? "Student dashboard"
+    : isTaDashboard
+    ? "TA dashboard"
+    : "Staff dashboard";
+
+  const subtitle = variant === "student"
+    ? "Track classes, submissions, and grades from one place."
+    : isTaDashboard
     ? "Review your assigned courses and current responsibilities."
-    : copy.subtitle;
+    : "Manage teaching tasks, materials, and communication.";
+
+  const highlights = DASHBOARD_HIGHLIGHTS[variant === "student" ? "student" : "staff"];
 
   return (
     <AppShell title={title} subtitle={subtitle}>
@@ -423,19 +563,15 @@ export default function DashboardPage({ variant }) {
           <TaAssignedCoursesPanel />
         ) : (
           <>
-            <div className="summary-grid">
-              {copy.summary.map((item) => (
-                <article key={item.label} className="summary-card">
-                  <span>{item.label}</span>
-                  <strong>{item.value}</strong>
-                </article>
-              ))}
-            </div>
+            {variant === "student"
+              ? <StudentSummaryGrid profileId={profile?.id} />
+              : <StaffSummaryGrid profileId={profile?.id} />
+            }
 
             <article className="content-card">
               <h2>What you can do here</h2>
               <ul className="feature-list">
-                {copy.highlights.map((item) => (
+                {highlights.map((item) => (
                   <li key={item}>{item}</li>
                 ))}
               </ul>
