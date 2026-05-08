@@ -26,6 +26,7 @@ export default function AssignmentsPage() {
   const { isAny } = useRole();
   const { profile } = useAuth();
   const canCreate = isAny(["professor", "ta", "admin"]);
+  const isStaff = profile?.role === "professor" || profile?.role === "ta";
 
   const [courses, setCourses] = useState([]);
   const [assignments, setAssignments] = useState([]);
@@ -37,6 +38,20 @@ export default function AssignmentsPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+
+    let assignedCourseIds = null;
+    if (isStaff && profile?.id) {
+      const { data: staffRec } = await supabase
+        .from("staff").select("id").eq("profile_id", profile.id).maybeSingle();
+      if (staffRec?.id) {
+        const { data: assigned } = await supabase
+          .from("course_staff").select("course_id").eq("staff_id", staffRec.id);
+        assignedCourseIds = new Set((assigned || []).map((r) => r.course_id));
+      } else {
+        assignedCourseIds = new Set();
+      }
+    }
+
     const [{ data: c }, { data: a }] = await Promise.all([
       supabase.from("courses").select("id, name, code").eq("is_active", true).order("code"),
       supabase
@@ -44,10 +59,18 @@ export default function AssignmentsPage() {
         .select("*, courses(name, code)")
         .order("due_date", { ascending: true }),
     ]);
-    setCourses(c || []);
-    setAssignments(a || []);
+
+    const courseList = assignedCourseIds
+      ? (c || []).filter((course) => assignedCourseIds.has(course.id))
+      : (c || []);
+    const assignmentList = assignedCourseIds
+      ? (a || []).filter((asn) => assignedCourseIds.has(asn.course_id))
+      : (a || []);
+
+    setCourses(courseList);
+    setAssignments(assignmentList);
     setLoading(false);
-  }, []);
+  }, [isStaff, profile?.id]);
 
   useEffect(() => { load(); }, [load]);
 

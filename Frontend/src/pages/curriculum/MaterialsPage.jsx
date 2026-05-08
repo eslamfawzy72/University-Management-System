@@ -19,6 +19,7 @@ export default function MaterialsPage() {
   const { isAny } = useRole();
   const { profile } = useAuth();
   const canUpload = isAny(["professor", "ta", "admin"]);
+  const isStaff = profile?.role === "professor" || profile?.role === "ta";
 
   const [courses, setCourses] = useState([]);
   const [selectedCourse, setSelectedCourse] = useState(null);
@@ -34,18 +35,36 @@ export default function MaterialsPage() {
   useEffect(() => {
     async function loadCourses() {
       setCoursesLoading(true);
+
+      let assignedCourseIds = null;
+      if (isStaff && profile?.id) {
+        const { data: staffRec } = await supabase
+          .from("staff").select("id").eq("profile_id", profile.id).maybeSingle();
+        if (staffRec?.id) {
+          const { data: assigned } = await supabase
+            .from("course_staff").select("course_id").eq("staff_id", staffRec.id);
+          assignedCourseIds = new Set((assigned || []).map((r) => r.course_id));
+        } else {
+          assignedCourseIds = new Set();
+        }
+      }
+
       const { data } = await supabase
         .from("courses")
         .select("id, name, code")
         .eq("is_active", true)
         .order("code");
-      const list = data || [];
+
+      const list = assignedCourseIds
+        ? (data || []).filter((c) => assignedCourseIds.has(c.id))
+        : (data || []);
+
       setCourses(list);
       if (list.length) setSelectedCourse(list[0].id);
       setCoursesLoading(false);
     }
     loadCourses();
-  }, []);
+  }, [isStaff, profile?.id]);
 
   const loadMaterials = useCallback(async () => {
     if (!selectedCourse) return;
