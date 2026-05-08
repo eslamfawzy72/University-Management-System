@@ -164,9 +164,12 @@ export default function FacilitiesPage() {
   const [myResLoading, setMyResLoading] = useState(false);
 
   // ── all reservations (admin) ──
-  const [allRes,        setAllRes]        = useState([]);
-  const [allResLoading, setAllResLoading] = useState(false);
-  const [allResError,   setAllResError]   = useState(null);
+  const [allRes,           setAllRes]           = useState([]);
+  const [allResLoading,    setAllResLoading]    = useState(false);
+  const [allResError,      setAllResError]      = useState(null);
+  const [allResFilterDate, setAllResFilterDate] = useState("");
+  const [allResFilterRoom, setAllResFilterRoom] = useState("");
+  const [allResFilterType, setAllResFilterType] = useState("");
 
   // ── edit modal ──
   const [editingRes, setEditingRes] = useState(null);
