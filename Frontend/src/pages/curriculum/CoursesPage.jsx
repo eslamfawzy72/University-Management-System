@@ -51,6 +51,9 @@ export default function CoursesPage() {
   const [adminAssignedCourseIds, setAdminAssignedCourseIds] = useState(new Set());
   const [staffAssignedCourseIds, setStaffAssignedCourseIds] = useState(new Set());
 
+  // Student view: "enrolled" = my courses, "catalog" = enroll in new ones
+  const [studentView, setStudentView] = useState("enrolled");
+
   const professorOptions = staffOptions.filter((s) => s.role === "professor" || s.role === "admin");
   const taOptions        = staffOptions.filter((s) => s.role === "ta");
 
@@ -424,6 +427,11 @@ export default function CoursesPage() {
     if (filterType !== "all" && c.type !== filterType) return false;
     if (filterDept !== "all" && c.department_id !== filterDept) return false;
     if (filterAssigned && !adminAssignedCourseIds.has(c.id)) return false;
+    if (isStudent) {
+      const hasStatus = !!enrollmentStatuses[c.id];
+      if (studentView === "enrolled" && !hasStatus) return false;
+      if (studentView === "catalog" && (hasStatus || !c.is_active)) return false;
+    }
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       const haystack = `${c.code} ${c.name} ${c.description ?? ""}`.toLowerCase();
@@ -432,9 +440,45 @@ export default function CoursesPage() {
     return true;
   });
 
+  const pageTitle    = isStudent && studentView === "enrolled" ? "My Courses" : "Courses";
+  const pageSubtitle = isStudent && studentView === "enrolled"
+    ? "Your enrolled and pending courses."
+    : "Browse the course catalog";
+
   return (
-    <AppShell title="Courses" subtitle="Browse the course catalog">
+    <AppShell title={pageTitle} subtitle={pageSubtitle}>
       <div className="dashboard-stack">
+
+        {/* Student mode toggle */}
+        {isStudent && (
+          <div className="content-card" style={{ padding: "12px 20px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+              <div style={{ display: "flex", gap: 0, borderRadius: 8, overflow: "hidden", border: "1px solid var(--border)" }}>
+                <button
+                  style={{
+                    padding: "7px 18px", fontSize: 14, fontWeight: 500, cursor: "pointer", border: "none",
+                    background: studentView === "enrolled" ? "var(--accent)" : "transparent",
+                    color: studentView === "enrolled" ? "#fff" : "var(--text-muted)",
+                  }}
+                  onClick={() => { setStudentView("enrolled"); setSearch(""); }}
+                >
+                  My Courses
+                </button>
+                <button
+                  style={{
+                    padding: "7px 18px", fontSize: 14, fontWeight: 500, cursor: "pointer", border: "none",
+                    background: studentView === "catalog" ? "var(--accent)" : "transparent",
+                    color: studentView === "catalog" ? "#fff" : "var(--text-muted)",
+                  }}
+                  onClick={() => { setStudentView("catalog"); setSearch(""); }}
+                >
+                  Enroll in a Course
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="page-header" style={{ flexWrap: "wrap", gap: 8 }}>
           <input
             className="search-input"
@@ -443,17 +487,21 @@ export default function CoursesPage() {
             onChange={(e) => setSearch(e.target.value)}
             style={{ flex: 1, minWidth: 220 }}
           />
-          <select value={filterType} onChange={(e) => setFilterType(e.target.value)}>
-            <option value="all">All types</option>
-            <option value="core">Core</option>
-            <option value="elective">Elective</option>
-          </select>
-          <select value={filterDept} onChange={(e) => setFilterDept(e.target.value)}>
-            <option value="all">All departments</option>
-            {departments.map((d) => (
-              <option key={d.id} value={d.id}>{d.name}</option>
-            ))}
-          </select>
+          {(!isStudent || studentView === "catalog") && (
+            <>
+              <select value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+                <option value="all">All types</option>
+                <option value="core">Core</option>
+                <option value="elective">Elective</option>
+              </select>
+              <select value={filterDept} onChange={(e) => setFilterDept(e.target.value)}>
+                <option value="all">All departments</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+            </>
+          )}
           {canManage && (
             <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 14, whiteSpace: "nowrap" }}>
               <input
@@ -470,11 +518,20 @@ export default function CoursesPage() {
         {loading && <p className="text-muted">Loading courses…</p>}
         {error && <p className="error-msg">{error}</p>}
 
-        {!loading && !error && courses.length === 0 && (
+        {!loading && !error && isStudent && studentView === "enrolled" && filteredCourses.length === 0 && (
+          <div className="empty-state">
+            <p>You are not enrolled in any courses yet.</p>
+            <BtnPrimary style={{ marginTop: 12 }} onClick={() => setStudentView("catalog")}>
+              Browse &amp; Enroll
+            </BtnPrimary>
+          </div>
+        )}
+
+        {!loading && !error && (!isStudent || studentView === "catalog") && courses.length === 0 && (
           <p className="empty-state">No courses found. {canManage && "Create your first course above."}</p>
         )}
 
-        {!loading && !error && courses.length > 0 && filteredCourses.length === 0 && (
+        {!loading && !error && (!isStudent || studentView === "catalog") && courses.length > 0 && filteredCourses.length === 0 && (
           <p className="empty-state">No courses match your search.</p>
         )}
 
