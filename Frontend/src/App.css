@@ -27,6 +27,35 @@
   --sans: "DM Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+[data-theme="dark"] {
+  --navy: #e8edf5;
+  --navy-mid: #c8d3e8;
+  --navy-light: #a0b0cc;
+  --accent: #4d8ef0;
+  --accent-hover: #3b7fea;
+  --accent-soft: #1a2e4a;
+  --gold: #f5a623;
+  --gold-soft: #2e2210;
+  --success: #2ecc71;
+  --success-soft: #0d2e1a;
+  --danger: #e74c3c;
+  --danger-soft: #2e1010;
+  --text: #e8edf5;
+  --text-muted: #8a97b0;
+  --text-light: #5a6a85;
+  --border: #1e2d45;
+  --surface: #111827;
+  --white: #1a2235;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] body,
+[data-theme="dark"] #root {
+  background: var(--surface);
+  color: var(--text);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -45,6 +74,7 @@ body {
     radial-gradient(circle at right 20%, rgba(245, 166, 35, 0.08), transparent 28%),
     var(--surface);
   color: var(--text);
+  transition: background-color 220ms ease, color 220ms ease;
 }
 
 a {
@@ -100,7 +130,8 @@ img {
 .chip-green { background: var(--success-soft); color: #1a7a42; }
 .chip-red { background: var(--danger-soft); color: var(--danger); }
 .chip-gray { background: var(--surface); color: var(--text-muted); }
-.chip-navy { background: #eef1f8; color: var(--navy-light); }
+.chip-navy { background: #eef1f8; color: #2a4480; }
+[data-theme="dark"] .chip-navy { background: #1a2e4a; color: #a0b0cc; }
 
 .btn {
   border: 0;
@@ -117,7 +148,7 @@ img {
 .btn-primary { background: var(--accent); color: var(--white); box-shadow: var(--shadow); }
 .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
 .btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
-.btn-ghost:hover:not(:disabled) { background: rgba(255, 255, 255, 0.7); }
+.btn-ghost:hover:not(:disabled) { background: var(--surface); }
 
 .fullscreen-state,
 .access-denied {
@@ -399,9 +430,13 @@ img {
   justify-content: space-between;
   min-height: 100svh;
   padding: 20px 12px 16px;
-  background: var(--navy);
-  color: var(--white);
+  background: #0d1b3e;
+  color: #ffffff;
   border-right: 1px solid rgba(255,255,255,0.06);
+}
+[data-theme="dark"] .app-shell__sidebar {
+  background: #0f1724;
+  border-right-color: rgba(255,255,255,0.04);
 }
 
 .sidebar-top { display: flex; flex-direction: column; gap: 0; flex: 1; }
@@ -426,7 +461,7 @@ img {
 .sidebar-card .chip-sm { font-size: 10px; padding: 2px 8px; }
 .sidebar-card__link { display: block; text-decoration: none; margin-top: 10px; }
 .sidebar-card__link:hover .sidebar-card__name { text-decoration: underline; }
-.sidebar-card__name { color: var(--white); font-size: 14px; font-weight: 600; margin-top: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sidebar-card__name { color: #ffffff; font-size: 14px; font-weight: 600; margin-top: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sidebar-card__email { margin-top: 2px; font-size: 11px; color: rgba(255,255,255,0.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .sidebar-nav { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
@@ -489,6 +524,21 @@ img {
 }
 
 .topbar-inbox:hover { background: var(--surface); border-color: var(--accent); color: var(--accent); }
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px; height: 34px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--white);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
+  flex-shrink: 0;
+}
+.theme-toggle:hover { border-color: var(--accent); color: var(--accent); background: var(--surface); }
 
 .topbar-inbox__badge {
   display: inline-flex;
@@ -803,7 +853,7 @@ img {
   padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: #fff;
+  background: var(--white);
 }
 
 .search-input {
@@ -812,7 +862,7 @@ img {
   border-radius: var(--radius-sm);
   font-size: 14px;
   font-family: var(--sans);
-  background: #fff;
+  background: var(--white);
   color: var(--text);
 }
 
