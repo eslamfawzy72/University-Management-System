@@ -160,8 +160,12 @@ export default function FacilitiesPage() {
   const [staffProfiles, setStaffProfiles] = useState([]);
 
   // ── my reservations ──
-  const [myRes,        setMyRes]        = useState([]);
-  const [myResLoading, setMyResLoading] = useState(false);
+  const [myRes,              setMyRes]              = useState([]);
+  const [myResLoading,       setMyResLoading]       = useState(false);
+  const [myResFilterDate,    setMyResFilterDate]    = useState("");
+  const [myResFilterRoom,    setMyResFilterRoom]    = useState("");
+  const [myResFilterType,    setMyResFilterType]    = useState("");
+  const [myResShowCancelled, setMyResShowCancelled] = useState(false);
 
   // ── all reservations (admin) ──
   const [allRes,           setAllRes]           = useState([]);
@@ -682,6 +686,23 @@ export default function FacilitiesPage() {
     );
   }
 
+  // ─── My-reservations filter ──────────────────────────────────────────────────
+
+  const filteredMyRes = myRes.filter((res) => {
+    if (!myResShowCancelled && res.status === "cancelled") return false;
+    if (myResFilterRoom && res.room_id !== myResFilterRoom) return false;
+    if (myResFilterType && res.rooms?.type !== myResFilterType) return false;
+    if (myResFilterDate) {
+      if (res.recurrence === "weekly") {
+        const dayIdx = jsDayToMyDay(new Date(`${myResFilterDate}T00:00`).getDay());
+        if (res.day_of_week !== dayIdx) return false;
+      } else {
+        if (isoToLocalDate(res.start_time) !== myResFilterDate) return false;
+      }
+    }
+    return true;
+  });
+
   // ─── All-reservations filter ─────────────────────────────────────────────────
 
   const filteredAllRes = allRes.filter((res) => {
@@ -840,10 +861,67 @@ export default function FacilitiesPage() {
         {/* ══ MY RESERVATIONS ══ */}
         {tab === "mine" && (
           <div className="content-card">
-            <h2>My Reservations</h2>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+              <h2 style={{ margin: 0 }}>
+                My Reservations
+                {(myResFilterDate || myResFilterRoom || myResFilterType) && (
+                  <span className="admission-filter-count" style={{ marginLeft: 8 }}>
+                    {filteredMyRes.length} result{filteredMyRes.length !== 1 ? "s" : ""}
+                  </span>
+                )}
+              </h2>
+            </div>
+
+            <div className="facilities-filter" style={{ marginBottom: 16 }}>
+              <div className="field">
+                <span>Date</span>
+                <input
+                  type="date"
+                  value={myResFilterDate}
+                  onChange={(e) => setMyResFilterDate(e.target.value)}
+                />
+              </div>
+              <div className="field">
+                <span>Room</span>
+                <select value={myResFilterRoom} onChange={(e) => setMyResFilterRoom(e.target.value)}>
+                  <option value="">All rooms</option>
+                  {rooms.map((r) => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <span>Type</span>
+                <select value={myResFilterType} onChange={(e) => setMyResFilterType(e.target.value)}>
+                  <option value="">All types</option>
+                  <option value="classroom">Classroom</option>
+                  <option value="lab">Lab</option>
+                </select>
+              </div>
+              <div className="field" style={{ justifyContent: "flex-end" }}>
+                <span>&nbsp;</span>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 14 }}>
+                  <input
+                    type="checkbox"
+                    checked={myResShowCancelled}
+                    onChange={(e) => setMyResShowCancelled(e.target.checked)}
+                  />
+                  Show cancelled
+                </label>
+              </div>
+              {(myResFilterDate || myResFilterRoom || myResFilterType) && (
+                <div className="field facilities-filter__btn">
+                  <span>&nbsp;</span>
+                  <BtnGhost onClick={() => { setMyResFilterDate(""); setMyResFilterRoom(""); setMyResFilterType(""); }}>
+                    Clear filters
+                  </BtnGhost>
+                </div>
+              )}
+            </div>
+
             {myResLoading
               ? <p className="text-muted">Loading…</p>
-              : <ReservationsTable rows={myRes} showReserver={false} />}
+              : <ReservationsTable rows={filteredMyRes} showReserver={false} />}
           </div>
         )}
 
