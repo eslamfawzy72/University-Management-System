@@ -68,16 +68,16 @@ export default function CoursesPage() {
       { data: d, error: dErr },
       { data: staffRows, error: sErr },
       { data: csRows, error: csErr },
-      { data: adminProfiles, error: apErr },
+      { data: staffProfiles, error: spErr },
     ] = await Promise.all([
       supabase.from("courses").select("*, departments(name)").order("code"),
       supabase.from("departments").select("id, name").order("name"),
       supabase.from("staff").select("id, profile_id, title, profiles(id, full_name, email, role)"),
       supabase.from("course_staff").select("id, course_id, staff_id, role"),
-      supabase.from("profiles").select("id, full_name, email").eq("role", "admin"),
+      supabase.from("profiles").select("id, full_name, email, role").in("role", ["admin", "professor", "ta"]),
     ]);
 
-    const firstErr = cErr || dErr || sErr || csErr || apErr;
+    const firstErr = cErr || dErr || sErr || csErr || spErr;
     if (firstErr) { setError(firstErr.message); setLoading(false); return; }
 
     setCourses(c || []);
@@ -94,17 +94,18 @@ export default function CoursesPage() {
         title: s.title,
       }));
 
-    // Admins without a staff row yet get a virtual entry (id prefixed with "v_")
-    // so they appear in the professor dropdown; the real staff row is created on save.
+    // Profiles with role admin/professor/ta that are missing a staff row get a
+    // virtual entry (id prefixed with "v_") so they appear in dropdowns.
+    // The real staff row is created by syncCourseStaff on first course save.
     const staffedProfileIds = new Set(mappedStaff.map((s) => s.profile_id));
-    for (const ap of (adminProfiles || [])) {
+    for (const ap of (staffProfiles || [])) {
       if (!staffedProfileIds.has(ap.id)) {
         mappedStaff.push({
           id: `v_${ap.id}`,
           profile_id: ap.id,
           full_name: ap.full_name,
           email: ap.email,
-          role: "admin",
+          role: ap.role,
           title: null,
         });
       }
@@ -378,6 +379,30 @@ export default function CoursesPage() {
   }
 
   async function handleDelete() {
+    // Remove dependent rows before deleting the course to avoid FK violations.
+    // assignments must come before submissions/grades (they FK to assignments).
+    const { data: assignmentRows } = await supabase
+      .from("assignments").select("id").eq("course_id", deleteId);
+    const assignmentIds = (assignmentRows ?? []).map((a) => a.id);
+
+    const cleanups = [
+      supabase.from("course_staff").delete().eq("course_id", deleteId),
+      supabase.from("course_enrollments").delete().eq("course_id", deleteId),
+      supabase.from("materials").delete().eq("course_id", deleteId),
+      supabase.from("forum_posts").delete().eq("course_id", deleteId),
+    ];
+    if (assignmentIds.length) {
+      cleanups.push(
+        supabase.from("assignment_submissions").delete().in("assignment_id", assignmentIds),
+        supabase.from("assignment_grades").delete().in("assignment_id", assignmentIds),
+        supabase.from("submissions").delete().in("assignment_id", assignmentIds),
+      );
+    }
+    await Promise.all(cleanups);
+    if (assignmentIds.length) {
+      await supabase.from("assignments").delete().eq("course_id", deleteId);
+    }
+
     const { error: err } = await supabase.from("courses").delete().eq("id", deleteId);
     if (err) { alert(err.message); return; }
     setModal(null);

@@ -7,7 +7,8 @@ import { supabase } from "../../lib/supabase";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const TODAY = new Date().toISOString().slice(0, 10);
+const _now = new Date();
+const TODAY = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, "0")}-${String(_now.getDate()).padStart(2, "0")}`;
 
 // 0=Monday … 6=Sunday  (base date 1970-01-05 = Monday)
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -31,13 +32,30 @@ function fmtSchedule(res) {
   return fmtDate(res.start_time);
 }
 
+/** Pad a number to 2 digits. */
+function p2(n) { return String(n).padStart(2, "0"); }
+
+/**
+ * Build a local-time ISO string (with timezone offset) so Supabase stores
+ * the exact wall-clock time the user entered, regardless of the browser's
+ * UTC offset. Example: "2026-05-08T10:00:00+02:00"
+ */
+function localIso(dateStr, timeStr) {
+  const d = new Date(`${dateStr}T${timeStr}`);
+  const off = -d.getTimezoneOffset();
+  const sign = off >= 0 ? "+" : "-";
+  const hh = p2(Math.floor(Math.abs(off) / 60));
+  const mm = p2(Math.abs(off) % 60);
+  return `${dateStr}T${timeStr}:00${sign}${hh}:${mm}`;
+}
+
 /**
  * Build an ISO timestamp for a weekly slot.
  * Uses the canonical week 1970-01-05 (Mon) … 1970-01-11 (Sun).
- * All arithmetic is in local time so round-trips survive correctly.
  */
 function weeklyTs(dayIdx, timeStr) {
-  return new Date(`1970-01-${String(5 + dayIdx).padStart(2, "0")}T${timeStr}`).toISOString();
+  const dateStr = `1970-01-${p2(5 + dayIdx)}`;
+  return localIso(dateStr, timeStr);
 }
 
 /** JS getDay() (0=Sun) → our 0=Mon system */
@@ -46,12 +64,12 @@ function jsDayToMyDay(jsDay) {
 }
 
 function localDateToISO(date, time) {
-  return new Date(`${date}T${time}`).toISOString();
+  return localIso(date, time);
 }
 
 function isoToLocalDate(ts) {
   const d = new Date(ts);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
 }
 
 function isoToLocalTime(ts) {
