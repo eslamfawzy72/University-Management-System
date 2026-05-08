@@ -176,11 +176,13 @@ function StaffGradesView({ profileId, isAdmin }) {
   const [students,    setStudents]    = useState([]); // [{ studentId, profileId, fullName, email }]
   const [grades,      setGrades]      = useState({}); // studentId -> { id, score, max_score, feedback }
   const [submissions, setSubmissions] = useState({}); // studentId -> { content, submitted_at }
-  const [viewingSub,  setViewingSub]  = useState(null); // { fullName, content, submittedAt }
-  const [loading,     setLoading]     = useState(true);
-  const [error,       setError]       = useState(null);
-  const [savingId,    setSavingId]    = useState(null);
-  const [saveError,   setSaveError]   = useState(null);
+  const [viewingSub,       setViewingSub]       = useState(null); // { fullName, content, submittedAt }
+  const [loading,          setLoading]          = useState(true);
+  const [error,            setError]            = useState(null);
+  const [savingId,         setSavingId]         = useState(null);
+  const [saveError,        setSaveError]        = useState(null);
+  const [filterSubmission, setFilterSubmission] = useState("all"); // "all" | "submitted" | "not_submitted"
+  const [filterGraded,     setFilterGraded]     = useState("all"); // "all" | "graded"   | "not_graded"
 
   // Load courses the user can manage
   const loadCourses = useCallback(async () => {
@@ -242,6 +244,12 @@ function StaffGradesView({ profileId, isAdmin }) {
     load();
     return () => { cancelled = true; };
   }, [selectedCourseId]);
+
+  // Reset row-level filters when assignment changes
+  useEffect(() => {
+    setFilterSubmission("all");
+    setFilterGraded("all");
+  }, [selectedAssignmentId]);
 
   // Load enrolled students + their grades + submissions for the selected assignment
   useEffect(() => {
@@ -389,10 +397,33 @@ function StaffGradesView({ profileId, isAdmin }) {
                   </option>
                 ))}
               </select>
+              <select value={filterSubmission} onChange={(e) => setFilterSubmission(e.target.value)}>
+                <option value="all">All submissions</option>
+                <option value="submitted">Submitted</option>
+                <option value="not_submitted">Not submitted</option>
+              </select>
+              <select value={filterGraded} onChange={(e) => setFilterGraded(e.target.value)}>
+                <option value="all">All grades</option>
+                <option value="graded">Graded</option>
+                <option value="not_graded">Not graded</option>
+              </select>
             </div>
 
             <div className="content-card">
-              <h2>Student Grades</h2>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+                <h2 style={{ margin: 0 }}>Student Grades</h2>
+                {(filterSubmission !== "all" || filterGraded !== "all") && (
+                  <span className="admission-filter-count">
+                    {students.filter((s) => {
+                      if (filterSubmission === "submitted"     && !submissions[s.studentId]) return false;
+                      if (filterSubmission === "not_submitted" &&  submissions[s.studentId]) return false;
+                      if (filterGraded    === "graded"         && !grades[s.studentId]?.id)  return false;
+                      if (filterGraded    === "not_graded"     &&  grades[s.studentId]?.id)  return false;
+                      return true;
+                    }).length} shown
+                  </span>
+                )}
+              </div>
               {saveError && <p className="error-msg">{saveError}</p>}
               {students.length === 0 ? (
                 <p className="empty-state">No enrolled students for this course.</p>
@@ -413,7 +444,13 @@ function StaffGradesView({ profileId, isAdmin }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {students.map((s) => {
+                      {students.filter((s) => {
+                        if (filterSubmission === "submitted"     && !submissions[s.studentId]) return false;
+                        if (filterSubmission === "not_submitted" &&  submissions[s.studentId]) return false;
+                        if (filterGraded    === "graded"         && !grades[s.studentId]?.id)  return false;
+                        if (filterGraded    === "not_graded"     &&  grades[s.studentId]?.id)  return false;
+                        return true;
+                      }).map((s) => {
                         const g = grades[s.studentId] ?? {};
                         return (
                           <tr key={s.studentId}>
