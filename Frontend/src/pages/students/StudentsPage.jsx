@@ -554,8 +554,11 @@ export default function StudentsPage() {
 
     // Create the staff row so the person appears in course assignment dropdowns.
     const staffPayload = { profile_id: newUserId };
-    if (staffForm.office.trim())      staffPayload.office        = staffForm.office.trim();
-    if (staffForm.department_id)      staffPayload.department_id = staffForm.department_id;
+    if (staffForm.office.trim()) staffPayload.office_location = staffForm.office.trim();
+    if (staffForm.department_id) {
+      const deptName = departments.find((d) => d.id === staffForm.department_id)?.name;
+      if (deptName) staffPayload.department = deptName;
+    }
     const { error: staffRowErr } = await supabase.from("staff").insert(staffPayload);
     if (staffRowErr) {
       setStaffSubmitError(`Account created but staff record failed: ${staffRowErr.message}`);
