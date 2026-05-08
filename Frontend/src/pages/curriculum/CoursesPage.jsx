@@ -365,6 +365,30 @@ export default function CoursesPage() {
   }
 
   async function handleDelete() {
+    // Remove dependent rows before deleting the course to avoid FK violations.
+    // assignments must come before submissions/grades (they FK to assignments).
+    const { data: assignmentRows } = await supabase
+      .from("assignments").select("id").eq("course_id", deleteId);
+    const assignmentIds = (assignmentRows ?? []).map((a) => a.id);
+
+    const cleanups = [
+      supabase.from("course_staff").delete().eq("course_id", deleteId),
+      supabase.from("course_enrollments").delete().eq("course_id", deleteId),
+      supabase.from("materials").delete().eq("course_id", deleteId),
+      supabase.from("forum_posts").delete().eq("course_id", deleteId),
+    ];
+    if (assignmentIds.length) {
+      cleanups.push(
+        supabase.from("assignment_submissions").delete().in("assignment_id", assignmentIds),
+        supabase.from("assignment_grades").delete().in("assignment_id", assignmentIds),
+        supabase.from("submissions").delete().in("assignment_id", assignmentIds),
+      );
+    }
+    await Promise.all(cleanups);
+    if (assignmentIds.length) {
+      await supabase.from("assignments").delete().eq("course_id", deleteId);
+    }
+
     const { error: err } = await supabase.from("courses").delete().eq("id", deleteId);
     if (err) { alert(err.message); return; }
     setModal(null);
