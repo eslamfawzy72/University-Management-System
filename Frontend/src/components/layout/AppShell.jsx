@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
 
 import { BtnGhost } from "../ui/Buttons";
 import { useAuth } from "../../hooks/useAuth";
@@ -10,9 +10,15 @@ import { supabase } from "../../lib/supabase";
 
 function InboxButton({ authUserId }) {
   const [unread, setUnread] = useState(0);
+  const { pathname } = useLocation();
 
   useEffect(() => {
     if (!authUserId) return;
+
+    if (pathname === "/messages") {
+      setUnread(0);
+      return;
+    }
 
     async function fetchUnread() {
       const { count } = await supabase
@@ -24,7 +30,7 @@ function InboxButton({ authUserId }) {
     }
 
     fetchUnread();
-  }, [authUserId]);
+  }, [authUserId, pathname]);
 
   return (
     <Link to="/messages" className="topbar-inbox">

@@ -267,7 +267,7 @@ function useStudentContacts(profile) {
 
       const { data: profileRows, error: e5 } = await supabase
         .from("profiles")
-        .select("id, full_name, email")
+        .select("id, full_name, email, role")
         .in("id", profileIds);
 
       if (e5) { setError(e5.message); setLoading(false); return; }
@@ -311,7 +311,7 @@ function useStudentContacts(profile) {
           id: p.id,
           full_name: p.full_name,
           email: p.email,
-          subtitle: s.title ?? "Professor",
+          subtitle: s.title || (p.role === "ta" ? "TA" : "Professor"),
           preview: previewMap[p.id] ?? null,
           hasUnread: unreadSet.has(p.id),
         });

@@ -14,7 +14,7 @@ const EMPTY_FORM = {
   capacity: "",
   department_id: "",
   is_active: true,
-  professor_staff_id: "",
+  professor_staff_ids: [],
   ta_staff_ids: [],
 };
 
@@ -253,8 +253,8 @@ export default function CoursesPage() {
   function openEdit(e, course) {
     e.stopPropagation();
     const assigned = courseStaffByCourse[course.id] || [];
-    const professorRow = assigned.find((r) => r.role === "professor");
-    const taRows = assigned.filter((r) => r.role === "ta");
+    const profRows = assigned.filter((r) => r.role === "professor");
+    const taRows   = assigned.filter((r) => r.role === "ta");
     setForm({
       name: course.name,
       code: course.code,
@@ -263,7 +263,7 @@ export default function CoursesPage() {
       capacity: course.capacity ?? "",
       department_id: course.department_id || "",
       is_active: course.is_active ?? true,
-      professor_staff_id: professorRow?.staff_id || "",
+      professor_staff_ids: profRows.map((r) => r.staff_id),
       ta_staff_ids: taRows.map((r) => r.staff_id),
     });
     setEditingId(course.id);
@@ -275,6 +275,15 @@ export default function CoursesPage() {
     e.stopPropagation();
     setDeleteId(id);
     setModal("delete");
+  }
+
+  function toggleProfessor(staffId) {
+    setForm((f) => {
+      const set = new Set(f.professor_staff_ids);
+      if (set.has(staffId)) set.delete(staffId);
+      else set.add(staffId);
+      return { ...f, professor_staff_ids: [...set] };
+    });
   }
 
   function toggleTa(staffId) {
@@ -295,27 +304,31 @@ export default function CoursesPage() {
 
     // Resolve virtual admin IDs (v_<profileId>) to real staff row IDs,
     // creating the staff row if it doesn't exist yet.
-    let professorStaffId = form.professor_staff_id;
-    if (professorStaffId?.startsWith("v_")) {
-      const profileId = professorStaffId.slice(2);
-      const { data: existing } = await supabase
-        .from("staff").select("id").eq("profile_id", profileId).maybeSingle();
-      if (existing) {
-        professorStaffId = existing.id;
-      } else {
-        const { data: created, error: createErr } = await supabase
-          .from("staff")
-          .insert({ profile_id: profileId, title: "Admin" })
-          .select("id")
-          .single();
-        if (createErr) return createErr;
-        professorStaffId = created.id;
+    const resolvedProfIds = [];
+    for (const rawId of form.professor_staff_ids) {
+      let profId = rawId;
+      if (profId?.startsWith("v_")) {
+        const profileId = profId.slice(2);
+        const { data: existing } = await supabase
+          .from("staff").select("id").eq("profile_id", profileId).maybeSingle();
+        if (existing) {
+          profId = existing.id;
+        } else {
+          const { data: created, error: createErr } = await supabase
+            .from("staff")
+            .insert({ profile_id: profileId, title: "Admin" })
+            .select("id")
+            .single();
+          if (createErr) return createErr;
+          profId = created.id;
+        }
       }
+      resolvedProfIds.push(profId);
     }
 
     const rows = [];
-    if (professorStaffId) {
-      rows.push({ course_id: courseId, staff_id: professorStaffId, role: "professor" });
+    for (const profId of resolvedProfIds) {
+      rows.push({ course_id: courseId, staff_id: profId, role: "professor" });
     }
     for (const taId of form.ta_staff_ids) {
       rows.push({ course_id: courseId, staff_id: taId, role: "ta" });
@@ -330,7 +343,7 @@ export default function CoursesPage() {
     setSaving(true);
     setFormError("");
     const {
-      professor_staff_id: _p,
+      professor_staff_ids: _p,
       ta_staff_ids: _t,
       ...courseFields
     } = form;
@@ -450,11 +463,11 @@ export default function CoursesPage() {
               const isFull = seats != null && seats <= 0;
               const canEnroll = isStudent && c.is_active && !myStatus && !isFull;
               const canNavigate = !isStudent || isEnrolled;
-              const assigned = courseStaffByCourse[c.id] || [];
-              const profRow = assigned.find((r) => r.role === "professor");
-              const taRows = assigned.filter((r) => r.role === "ta");
-              const profName = profRow ? staffNameById(profRow.staff_id) : null;
-              const taNames = taRows.map((r) => staffNameById(r.staff_id)).filter(Boolean);
+              const assigned  = courseStaffByCourse[c.id] || [];
+              const profRows  = assigned.filter((r) => r.role === "professor");
+              const taRows    = assigned.filter((r) => r.role === "ta");
+              const profNames = profRows.map((r) => staffNameById(r.staff_id)).filter(Boolean);
+              const taNames   = taRows.map((r) => staffNameById(r.staff_id)).filter(Boolean);
 
               return (
                 <div
@@ -475,12 +488,14 @@ export default function CoursesPage() {
                     <p className="course-card__desc">{c.description}</p>
                   )}
 
-                  {(profName || taNames.length > 0) && (
+                  {(profNames.length > 0 || taNames.length > 0) && (
                     <div className="course-card__staff">
-                      {profName && (
+                      {profNames.length > 0 && (
                         <div className="course-card__staff-row">
-                          <span className="course-card__staff-label">Professor</span>
-                          <span className="course-card__staff-value">{profName}</span>
+                          <span className="course-card__staff-label">
+                            Professor{profNames.length > 1 ? "s" : ""}
+                          </span>
+                          <span className="course-card__staff-value">{profNames.join(", ")}</span>
                         </div>
                       )}
                       {taNames.length > 0 && (
@@ -584,22 +599,22 @@ export default function CoursesPage() {
                 </div>
               </div>
               <div className="field">
-                <span>Professor</span>
-                <select
-                  value={form.professor_staff_id}
-                  onChange={(e) => field("professor_staff_id", e.target.value)}
-                >
-                  <option value="">— Unassigned —</option>
-                  {professorOptions.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.full_name}{s.email ? ` (${s.email})` : ""}
-                    </option>
-                  ))}
-                </select>
-                {professorOptions.length === 0 && (
-                  <small className="text-muted">
-                    No professors found in the staff directory yet.
-                  </small>
+                <span>Professors</span>
+                {professorOptions.length === 0 ? (
+                  <small className="text-muted">No professors found in the staff directory yet.</small>
+                ) : (
+                  <div className="checkbox-list">
+                    {professorOptions.map((s) => (
+                      <label key={s.id} className="field-checkbox">
+                        <input
+                          type="checkbox"
+                          checked={form.professor_staff_ids.includes(s.id)}
+                          onChange={() => toggleProfessor(s.id)}
+                        />
+                        <span>{s.full_name}{s.email ? ` (${s.email})` : ""}</span>
+                      </label>
+                    ))}
+                  </div>
                 )}
               </div>
 
