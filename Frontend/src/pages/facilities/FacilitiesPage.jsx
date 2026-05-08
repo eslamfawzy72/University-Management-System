@@ -850,11 +850,57 @@ export default function FacilitiesPage() {
         {/* ══ ALL RESERVATIONS (admin) ══ */}
         {tab === "all" && isAdmin && (
           <div className="content-card">
-            <h2>All Reservations</h2>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+              <h2 style={{ margin: 0 }}>
+                All Reservations
+                {(allResFilterDate || allResFilterRoom || allResFilterType) && (
+                  <span className="admission-filter-count" style={{ marginLeft: 8 }}>
+                    {filteredAllRes.length} result{filteredAllRes.length !== 1 ? "s" : ""}
+                  </span>
+                )}
+              </h2>
+            </div>
+
+            <div className="facilities-filter" style={{ marginBottom: 16 }}>
+              <div className="field">
+                <span>Date</span>
+                <input
+                  type="date"
+                  value={allResFilterDate}
+                  onChange={(e) => setAllResFilterDate(e.target.value)}
+                />
+              </div>
+              <div className="field">
+                <span>Room</span>
+                <select value={allResFilterRoom} onChange={(e) => setAllResFilterRoom(e.target.value)}>
+                  <option value="">All rooms</option>
+                  {rooms.map((r) => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <span>Type</span>
+                <select value={allResFilterType} onChange={(e) => setAllResFilterType(e.target.value)}>
+                  <option value="">All types</option>
+                  <option value="classroom">Classroom</option>
+                  <option value="lab">Lab</option>
+                </select>
+              </div>
+              {(allResFilterDate || allResFilterRoom || allResFilterType) && (
+                <div className="field facilities-filter__btn">
+                  <span>&nbsp;</span>
+                  <BtnGhost onClick={() => { setAllResFilterDate(""); setAllResFilterRoom(""); setAllResFilterType(""); }}>
+                    Clear filters
+                  </BtnGhost>
+                </div>
+              )}
+            </div>
+
             {allResLoading && <p className="text-muted">Loading…</p>}
             {allResError   && <p className="error-msg">{allResError}</p>}
             {!allResLoading && !allResError && (
-              <ReservationsTable rows={allRes} showReserver={true} />
+              <ReservationsTable rows={filteredAllRes} showReserver={true} />
             )}
           </div>
         )}
