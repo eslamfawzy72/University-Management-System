@@ -682,6 +682,22 @@ export default function FacilitiesPage() {
     );
   }
 
+  // ─── All-reservations filter ─────────────────────────────────────────────────
+
+  const filteredAllRes = allRes.filter((res) => {
+    if (allResFilterRoom && res.room_id !== allResFilterRoom) return false;
+    if (allResFilterType && res.rooms?.type !== allResFilterType) return false;
+    if (allResFilterDate) {
+      if (res.recurrence === "weekly") {
+        const dayIdx = jsDayToMyDay(new Date(`${allResFilterDate}T00:00`).getDay());
+        if (res.day_of_week !== dayIdx) return false;
+      } else {
+        if (isoToLocalDate(res.start_time) !== allResFilterDate) return false;
+      }
+    }
+    return true;
+  });
+
   // ─── Render ──────────────────────────────────────────────────────────────────
 
   const TABS = [
