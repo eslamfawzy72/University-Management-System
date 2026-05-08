@@ -559,7 +559,8 @@ export default function StudentsPage() {
       const deptName = departments.find((d) => d.id === staffForm.department_id)?.name;
       if (deptName) staffPayload.department = deptName;
     }
-    const { error: staffRowErr } = await supabase.from("staff").insert(staffPayload);
+    // Insert as the new user (tmp session) so profile_id = auth.uid() satisfies RLS.
+    const { error: staffRowErr } = await tmp.from("staff").insert(staffPayload);
     if (staffRowErr) {
       setStaffSubmitError(`Account created but staff record failed: ${staffRowErr.message}`);
       setStaffSubmitting(false);
