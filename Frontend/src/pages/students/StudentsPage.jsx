@@ -460,6 +460,14 @@ export default function StudentsPage() {
     });
     if (appErr) { setSubmitError(appErr.message); setSubmitting(false); return; }
 
+    const { error: studentRowErr } = await supabase.from("students").insert({
+      profile_id:      newUserId,
+      student_number:  form.studentNumber.trim(),
+      enrollment_date: new Date().toISOString().split("T")[0],
+      status:          "active",
+    });
+    if (studentRowErr) { setSubmitError(`Account created but student record failed: ${studentRowErr.message}`); setSubmitting(false); return; }
+
     setSubmitting(false);
     setTempPassword(pwd);
     loadStudents();
