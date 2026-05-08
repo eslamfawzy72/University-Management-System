@@ -68,16 +68,16 @@ export default function CoursesPage() {
       { data: d, error: dErr },
       { data: staffRows, error: sErr },
       { data: csRows, error: csErr },
-      { data: adminProfiles, error: apErr },
+      { data: staffProfiles, error: spErr },
     ] = await Promise.all([
       supabase.from("courses").select("*, departments(name)").order("code"),
       supabase.from("departments").select("id, name").order("name"),
       supabase.from("staff").select("id, profile_id, title, profiles(id, full_name, email, role)"),
       supabase.from("course_staff").select("id, course_id, staff_id, role"),
-      supabase.from("profiles").select("id, full_name, email").eq("role", "admin"),
+      supabase.from("profiles").select("id, full_name, email, role").in("role", ["admin", "professor", "ta"]),
     ]);
 
-    const firstErr = cErr || dErr || sErr || csErr || apErr;
+    const firstErr = cErr || dErr || sErr || csErr || spErr;
     if (firstErr) { setError(firstErr.message); setLoading(false); return; }
 
     setCourses(c || []);
@@ -94,17 +94,18 @@ export default function CoursesPage() {
         title: s.title,
       }));
 
-    // Admins without a staff row yet get a virtual entry (id prefixed with "v_")
-    // so they appear in the professor dropdown; the real staff row is created on save.
+    // Profiles with role admin/professor/ta that are missing a staff row get a
+    // virtual entry (id prefixed with "v_") so they appear in dropdowns.
+    // The real staff row is created by syncCourseStaff on first course save.
     const staffedProfileIds = new Set(mappedStaff.map((s) => s.profile_id));
-    for (const ap of (adminProfiles || [])) {
+    for (const ap of (staffProfiles || [])) {
       if (!staffedProfileIds.has(ap.id)) {
         mappedStaff.push({
           id: `v_${ap.id}`,
           profile_id: ap.id,
           full_name: ap.full_name,
           email: ap.email,
-          role: "admin",
+          role: ap.role,
           title: null,
         });
       }
