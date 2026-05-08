@@ -171,9 +171,10 @@ export default function FacilitiesPage() {
   const [allRes,           setAllRes]           = useState([]);
   const [allResLoading,    setAllResLoading]    = useState(false);
   const [allResError,      setAllResError]      = useState(null);
-  const [allResFilterDate, setAllResFilterDate] = useState("");
-  const [allResFilterRoom, setAllResFilterRoom] = useState("");
-  const [allResFilterType, setAllResFilterType] = useState("");
+  const [allResFilterDate,    setAllResFilterDate]    = useState("");
+  const [allResFilterRoom,    setAllResFilterRoom]    = useState("");
+  const [allResFilterType,    setAllResFilterType]    = useState("");
+  const [allResShowCancelled, setAllResShowCancelled] = useState(false);
 
   // ── edit modal ──
   const [editingRes, setEditingRes] = useState(null);
@@ -706,6 +707,7 @@ export default function FacilitiesPage() {
   // ─── All-reservations filter ─────────────────────────────────────────────────
 
   const filteredAllRes = allRes.filter((res) => {
+    if (!allResShowCancelled && res.status === "cancelled") return false;
     if (allResFilterRoom && res.room_id !== allResFilterRoom) return false;
     if (allResFilterType && res.rooms?.type !== allResFilterType) return false;
     if (allResFilterDate) {
@@ -964,6 +966,17 @@ export default function FacilitiesPage() {
                   <option value="classroom">Classroom</option>
                   <option value="lab">Lab</option>
                 </select>
+              </div>
+              <div className="field" style={{ justifyContent: "flex-end" }}>
+                <span>&nbsp;</span>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 14 }}>
+                  <input
+                    type="checkbox"
+                    checked={allResShowCancelled}
+                    onChange={(e) => setAllResShowCancelled(e.target.checked)}
+                  />
+                  Show cancelled
+                </label>
               </div>
               {(allResFilterDate || allResFilterRoom || allResFilterType) && (
                 <div className="field facilities-filter__btn">
